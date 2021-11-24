@@ -1,0 +1,127 @@
+{
+  "name": "DemoPoA",
+  "engine": {
+    "authorityRound": {
+      "params": {
+        "stepDuration": "10",
+        "validators": {
+          "list": ["0xd1882d69a4c3e9401c7170cc501a5283fb1fed20"]
+        }
+      }
+    }
+  },
+  "params": {
+    "gasLimitBoundDivisor": "0x400",
+    "maximumExtraDataSize": "0x20",
+    "minGasLimit": "0x1388",
+    "networkID": "0x2323",
+    "eip150Transition": "0x0",
+    "eip160Transition": "0x0",
+    "eip161abcTransition": "0x0",
+    "eip161dTransition": "0x0",
+    "eip140Transition": "0x0",
+    "eip211Transition": "0x0",
+    "eip214Transition": "0x0",
+    "eip155Transition": "0x0",
+    "eip658Transition": "0x0",
+    "eip145Transition": "0x0",
+    "eip1014Transition": "0x0",
+    "eip1052Transition": "0x0",
+    "eip1283Transition": "0x0",
+    "eip1344Transition": "0x0",
+    "eip1706Transition": "0x0",
+    "eip1884Transition": "0x0",
+    "eip2028Transition": "0x0",
+    "eip2929Transition": "0x0",
+    "eip2930Transition": "0x0",
+    "eip1559Transition": "0x0",
+    "eip3198Transition": "0x0",
+    "eip3541Transition": "0x0",
+    "eip3529Transition": "0x0",
+    "eip1559BaseFeeMaxChangeDenominator": "0x8",
+    "eip1559ElasticityMultiplier": "0x2",
+    "eip1559BaseFeeInitialValue": "0x3B9ACA00"
+  },
+  "genesis": {
+    "seal": {
+      "authorityRound": {
+        "step": "0x0",
+        "signature": "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    "difficulty": "0x20000",
+    "gasLimit": "0x5B8D80",
+    "baseFeePerGas": "0x3B9ACA00"
+  },
+  "accounts": {
+    "0x0000000000000000000000000000000000000001": {
+      "balance": "1",
+      "builtin": {
+        "name": "ecrecover",
+        "pricing": {
+          "linear": {
+            "base": 3000,
+            "word": 0
+          }
+        }
+      }
+    },
+    "0x0000000000000000000000000000000000000002": {
+      "balance": "1",
+      "builtin": {
+        "name": "sha256",
+        "pricing": {
+          "linear": {
+            "base": 60,
+            "word": 12
+          }
+        }
+      }
+    },
+    "0x0000000000000000000000000000000000000003": {
+      "balance": "1",
+      "builtin": {
+        "name": "ripemd160",
+        "pricing": {
+          "linear": {
+            "base": 600,
+            "word": 120
+          }
+        }
+      }
+    },
+    "0x0000000000000000000000000000000000000004": {
+      "balance": "1",
+      "builtin": {
+        "name": "identity",
+        "pricing": {
+          "linear": {
+            "base": 15,
+            "word": 3
+          }
+        }
+      }
+    },
+    "0xdCC034Af90c2b724AC88Be88F7ab74E40d95c31F": {
+      "balance": "100000000000000000000000000"
+    },
+    "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266": {
+      "balance": "100000000000000000000000000"
+    },
+    "0x70997970c51812dc3a010c7d01b50e0d17dc79c8": {
+      "balance": "100000000000000000000000000"
+    },
+    "0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc": {
+      "balance": "100000000000000000000000000"
+    },
+    "0x90f79bf6eb2c4f870365e785982e1f101e93b906": {
+      "balance": "100000000000000000000000000"
+    },
+    "0x15d34aaf54267db7d7c367839aaf71a00a2c6a65": {
+      "balance": "100000000000000000000000000"
+    },
+    "0x9965507d1a55bcc2695c58ba16fb37d819b0a4dc": {
+      "balance": "100000000000000000000000000"
+    }
+  }
+}

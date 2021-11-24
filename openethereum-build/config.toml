@@ -1,0 +1,42 @@
+# File node0.toml
+
+[parity]
+chain = "/parity-config-data/spec.json"
+base_path = "/parity-data"
+
+[network]
+port = 65355
+#bootnodes = ["enode://38ea0aa08bfbef9bf03a41b806da0fb326967c6c6647760ea681f562077e3d16321eb97d18785a9486b3090b4ae00440e6e2bd49593e06fb61268d282df48251@10.0.22.189:65535"]
+warp = false
+
+[rpc]
+interface = "0.0.0.0"
+hosts = ["all"]
+port = 80
+apis = ["web3", "eth", "net", "personal", "parity", "parity_set", "traces", "rpc", "parity_accounts"]
+processing_threads = 12
+server_threads = 24
+cors = ["*", "all"]   # allow Remix to connect to this node
+
+[websockets]
+disable = false
+port = 8546
+interface = "0.0.0.0"
+max_connections = 1000
+apis = ["web3","eth","net","parity","pubsub","traces"]
+origins = ["all"]
+hosts = ["all"]
+
+[footprint]
+tracing = "on"
+pruning = "archive"
+fat_db = "on"
+
+[mining]
+engine_signer = "0xd1882d69a4c3e9401c7170cc501a5283fb1fed20"
+# 0x address^
+reseal_on_txs = "none"
+force_sealing = true
+
+[account]
+password = ["/parity-config-data/password"]

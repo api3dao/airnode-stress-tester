@@ -1,0 +1,84 @@
+version: '3.7'
+
+services:
+  mitmproxy-hh:
+    image: mitmproxy/mitmproxy
+    networks:
+      traefik-web:
+    deploy:
+      labels:
+        - 'traefik.enable=true'
+        - 'traefik.http.routers.mitmhh.rule=Host(`mitm-hardhat.api3mock.link`)'
+        - 'traefik.http.routers.mitmhh.entrypoints=web'
+        - 'traefik.http.services.mitmhh.loadbalancer.server.port=8080' # it seems you always need to give traefik a port so it 'notices' the service
+        - 'traefik.http.routers.mitmhh-secured.rule=Host(`mitm-hardhat.api3mock.link`)'
+        - 'traefik.http.routers.mitmhh-secured.entrypoints=web-secured'
+        - 'traefik.http.routers.mitmhh-secured.tls.certresolver=mytlschallenge'
+    ports:
+      - target: 8081
+        published: 8080
+        protocol: tcp
+        mode: host
+
+    command: mitmweb --web-host 0.0.0.0 --mode reverse:http://tasks.hardhat:8545
+
+  mock-json-rpc-api:
+    image: aquarat/mock-json-rpc-api:latest
+    networks:
+      traefik-web:
+    deploy:
+      labels:
+        - 'traefik.enable=true'
+        - 'traefik.http.routers.mockedrpc.rule=Host(`mockedrpc.api3mock.link`)'
+        - 'traefik.http.routers.mockedrpc.entrypoints=web'
+        - 'traefik.http.services.mockedrpc.loadbalancer.server.port=80' # it seems you always need to give traefik a port so it 'notices' the service
+        - 'traefik.http.routers.mockedrpc-secured.rule=Host(`mockedrpc.api3mock.link`)'
+        - 'traefik.http.routers.mockedrpc-secured.entrypoints=web-secured'
+        - 'traefik.http.routers.mockedrpc-secured.tls.certresolver=mytlschallenge'
+
+  hardhat:
+    image: aquarat/hardhat:latest
+    deploy:
+      labels:
+        - 'traefik.enable=true'
+        - 'traefik.http.routers.hardhat.rule=Host(`hardhat.api3mock.link`)'
+        - 'traefik.http.routers.hardhat.entrypoints=web'
+        - 'traefik.http.services.hardhat.loadbalancer.server.port=8545' # it seems you always need to give traefik a port so it 'notices' the service
+        - 'traefik.http.routers.hardhat-secured.rule=Host(`hardhat.api3mock.link`)'
+        - 'traefik.http.routers.hardhat-secured.entrypoints=web-secured'
+        - 'traefik.http.routers.hardhat-secured.tls.certresolver=mytlschallenge'
+    networks:
+      traefik-web:
+    entrypoint: "bash -c 'npx hardhat node'"
+
+  mock-api:
+    image: aquarat/mock-api:latest
+    deploy:
+      labels:
+        - 'traefik.enable=true'
+        - 'traefik.http.routers.mock-api.rule=Host(`mock-api.api3mock.link`)'
+        - 'traefik.http.routers.mock-api.entrypoints=web'
+        - 'traefik.http.services.mock-api.loadbalancer.server.port=80' # it seems you always need to give traefik a port so it 'notices' the service
+        - 'traefik.http.routers.mock-api-secured.rule=Host(`mock-api.api3mock.link`)'
+        - 'traefik.http.routers.mock-api-secured.entrypoints=web-secured'
+        - 'traefik.http.routers.mock-api-secured.tls.certresolver=mytlschallenge'
+    networks:
+      traefik-web:
+
+  openethereum:
+    image: aquarat/openethereum:latest
+    deploy:
+      labels:
+        - 'traefik.enable=true'
+        - 'traefik.http.routers.oe.rule=Host(`openethereum.api3mock.link`)'
+        - 'traefik.http.routers.oe.entrypoints=web'
+        - 'traefik.http.services.oe.loadbalancer.server.port=80' # it seems you always need to give traefik a port so it 'notices' the service
+        - 'traefik.http.routers.oe-secured.rule=Host(`openethereum.api3mock.link`)'
+        - 'traefik.http.routers.oe-secured.entrypoints=web-secured'
+        - 'traefik.http.routers.oe-secured.tls.certresolver=mytlschallenge'
+    networks:
+      traefik-web:
+
+networks:
+  traefik-web:
+    external: true

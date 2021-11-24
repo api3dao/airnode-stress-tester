@@ -1,0 +1,7 @@
+{
+  "integration": "coingecko",
+  "airnodeType": "aws",
+  "network": "localhost",
+  "mnemonic": "test test test test test test test test test test test junk",
+  "providerUrl": "https://aquarat.ngrok.io/rpc"
+}

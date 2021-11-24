@@ -1,0 +1,16 @@
+version: '3.5'
+
+services:
+  postgres:
+    image: postgres
+    environment:
+      - POSTGRES_PASSWORD=airnode
+      - POSTGRES_USER=airnode
+      - POSTGRES_DB=airnode
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+volumes:
+  pg_data:

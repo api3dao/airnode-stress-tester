@@ -1,0 +1,60 @@
+version: '3.7'
+
+services:
+  # ngrok is the gateway to the services stack
+  # ngrok connects incoming connections to MITM Proxy, which allows us to inspect requests
+  # Credentials below are for illustration only.
+  ngrok:
+    image: wernight/ngrok
+    environment:
+      - 'NGROK_AUTH=1zqx8HNB58Lt7ovM1lh2x6ZPUNZ_6GrMzV2Fp7Hrckbvmz8H1'
+      - 'NGROK_PORT=8080'
+      - 'NGROK_LOOK_DOMAIN=mitmproxy'
+      - 'NGROK_DEBUG=true'
+      - 'NGROK_SUBDOMAIN=aquarat'
+
+  # MITM Proxy points to the nginx reverse proxy service
+  mitmproxy:
+    image: mitmproxy/mitmproxy
+    ports:
+      - 8081:8081
+    command: mitmweb --web-host 0.0.0.0 --mode reverse:http://nginx-proxy
+
+  nginx-proxy:
+    image: aquarat/nginx-router:latest
+    build: ./nginx-build
+
+  # Runs a HardHat network
+  hardhat:
+    image: aquarat/hardhat:latest
+    build: ./hardhat-build
+    entrypoint: "bash -c 'npx hardhat node'"
+
+  # Mocks the Coingecko API
+  mock-api:
+    image: aquarat/mock-api:latest
+    build: ./mock-api
+
+  # Runs OpenEthereum in Proof-of-Authority single-node mode
+  openethereum:
+    image: aquarat/openethereum:latest
+    build: ./openethereum-build
+
+  # Mocks an EVM RPC with largely hardcoded responses
+  mock-json-rpc-api:
+    image: aquarat/mock-json-rpc-api:latest
+    build: ./mock-json-rpc
+
+  postgres:
+    image: postgres
+    environment:
+      - POSTGRES_PASSWORD=airnode
+      - POSTGRES_USER=airnode
+      - POSTGRES_DB=airnode
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    ports:
+      - 5432:5432
+
+volumes:
+  pg_data:
