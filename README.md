@@ -174,7 +174,7 @@ I've used Grafana as the graphing system for the telemetry collected by the stre
 apropriate to ship Grafana's configuration files as part of this system, so I have included the SQL queries below used
 to generate graphs.
 
-####Durations:
+#### Durations:
 
 ```sql
         SELECT
@@ -188,7 +188,7 @@ to generate graphs.
         ORDER BY request_count ASC;
 ```
 
-####Memory Usage:
+#### Memory Usage:
 
 ```sql
         SELECT
