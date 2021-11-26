@@ -196,6 +196,11 @@ export const getMetrics = async () => {
  * Tries to retrieve logs from CloudWatch and checks the result for a complete log set.
  */
 export const collectMetrics = async (): Promise<{ metrics: any; success: boolean }> => {
+  for (let i = 0; i < 10000; i++) {
+    await doTimeout(10000);
+    console.log("waiting...", i);
+  }
+
   for (let count = 15; count > -1; count--) {
     try {
       await doTimeout(10000);

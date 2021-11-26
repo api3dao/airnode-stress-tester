@@ -29,6 +29,7 @@ sudo ./get-docker.sh
 sudo usermod -aG docker $USER
 # (log out and back in again)
 docker swarm init
+docker network create --attachable -d overlay traefik-web
 ```
 
 and that's that, docker swarm is ready. For the uninitiated, docker swarm in single-node mode largely behaves like

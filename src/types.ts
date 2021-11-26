@@ -41,6 +41,12 @@ export interface RequestSet {
   ChainCount: number;
 }
 
+export interface CloudProvider {
+  name: 'aws' | 'gcp';
+  projectId: string;
+  region: string;
+}
+
 /**
  * Stress Test Config type
  */
@@ -57,6 +63,7 @@ export interface StressTestConfig {
   MasterWalletOverrideMnemonic?: string;
   InfuraProviderAirnodeOverrideURL?: string;
   Comment?: string;
+  CloudProvider: CloudProvider;
 }
 
 /**

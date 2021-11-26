@@ -6,10 +6,7 @@ import '@nomiclabs/hardhat-ethers';
 import { IntegrationInfo, getIntegrationInfo } from './src';
 
 const integrationInfoPath = join(__dirname, 'integration-info.json');
-let integrationInfo: IntegrationInfo | null = null;
-if (existsSync(integrationInfoPath)) {
-  integrationInfo = getIntegrationInfo();
-}
+const integrationInfo = getIntegrationInfo();
 
 const networks: any = {};
 if (integrationInfo) {

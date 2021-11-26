@@ -1,5 +1,6 @@
+import path, { join } from 'path';
+import * as os from 'os';
 import { readFileSync, writeFileSync } from 'fs';
-import { join } from 'path';
 import { spawn } from 'child_process';
 import { randomUUID } from 'crypto';
 import { Worker } from 'worker_threads';
@@ -8,6 +9,19 @@ import { ContractsAndRequestsConfig, IntegrationInfo, StressTestConfig } from '.
 import { generateConfigJson } from './config_utils';
 import { cliPrint } from './cli';
 import { getAirnodeWalletMnemonic } from './chain';
+
+export const getGcpCredentials = () => {
+  const stressTestConfig = getStressTestConfig();
+  if (stressTestConfig.CloudProvider.name === 'gcp') {
+    return [
+      ` -v ${path.join(os.homedir(), '/.config/gcloud/application_default_credentials.json:/application_default_credentials.json')} `,
+      ' -e "GOOGLE_APPLICATION_CREDENTIALS=/application_default_credentials.json" '
+    ];
+  }
+
+  return [' ', ' '];
+};
+
 
 /**
  * @returns a provider URL based on the stress test config dictionary and optionally a request count (only applicable
@@ -287,14 +301,18 @@ export const removeAirnode = async () => {
   const integrationPath = join(__dirname, '../integration-info.json');
   writeFileSync(integrationPath, JSON.stringify(getIntegrationInfo()));
   const secretsFilePath = join(__dirname, '../aws.env');
+  const [gcpCredsMount, gcpCredsEnv ] = getGcpCredentials();
 
   const deployCommand = [
     `docker run -i --rm`,
     `--env-file ${secretsFilePath}`,
     `-e USER_ID=$(id -u) -e GROUP_ID=$(id -g)`,
+    gcpCredsEnv,
+    gcpCredsMount,
     `-v ${join(__dirname, '../')}:/app/output`,
     `api3/airnode-deployer:latest remove -r output/receipt.json --debug`,
   ].join(' ');
+  console.log(deployCommand);
 
   cliPrint.info(deployCommand);
   // runShellCommand(deployCommand);

@@ -1,0 +1,37 @@
+{
+  "TestRuns": [
+    {
+      "RequestCount": 1,
+      "WalletCount": 2,
+      "ChainCount": 1
+    }
+  ],
+  "RunRepeats": 1,
+  "JsonOutputConfig": {
+    "Enabled": true,
+    "FilePath": "metrics.json"
+  },
+  "SshConfig": {
+    "SshKeyPath": "/home/aquarat/Downloads/211125API3-aquarat.pem",
+    "SshRemoteHost": "graphs.api3mock.link",
+    "SshUser": "ubuntu",
+    "SshPort": 22,
+    "YamlPath": "/home/ubuntu/stress-services.yml"
+  },
+  "PostgresConfig": {
+    "PostgresEnabled": true,
+    "PostgresUser": "airnode",
+    "PostgresPassword": "airnode",
+    "PostgresHost": "graphs.api3mock.link",
+    "PostgresPort": 5432,
+    "PostgresDatabase": "airnode"
+  },
+  "RandomLength": 5,
+  "TestType": "HardHatProvider",
+  "Comment": "GCP First",
+  "CloudProvider": {
+    "name": "gcp",
+    "region": "us-east4",
+    "projectId": "api3-333217"
+  }
+}

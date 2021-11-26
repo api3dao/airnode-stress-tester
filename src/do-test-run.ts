@@ -1,7 +1,7 @@
 import * as crypto from 'crypto';
 import { isMainThread, parentPort } from 'worker_threads';
 import { existsSync } from 'fs';
-import { join } from 'path';
+import path, { join } from 'path';
 import * as os from 'os';
 import { ethers } from 'ethers';
 import * as admin from '@api3/airnode-admin/dist/src/implementation';
@@ -33,7 +33,10 @@ import {
   makeMessage,
   Messages,
   removeAirnode,
-  generateConfigJson, getEncodedParameters, generateRandomString,
+  generateConfigJson, 
+  getEncodedParameters, 
+  generateRandomString,
+  getGcpCredentials
 } from './';
 
 process.env.AWS_SDK_LOAD_CONFIG = String(true);
@@ -51,6 +54,19 @@ const setPriority = () => {
     //do nothing
   }
 };
+
+/*
+export const getGcpCredentials = () => {
+  const stressTestConfig = getStressTestConfig();
+  if (stressTestConfig.CloudProvider.name === 'gcp') {
+    return [
+      ` -v ${path.join(os.homedir(), '/.config/gcloud/application_default_credentials.json:/application_default_credentials.json')} `,
+      ' -e "GOOGLE_APPLICATION_CREDENTIALS=/application_default_credentials.json" '
+    ];
+  }
+
+  return [' ', ' '];
+};*/
 
 /**
  * The main function acts as the parent process in the multi-threaded cluster.
@@ -141,7 +157,7 @@ const main = async () => {
               `ssh -o UserKnownHostsFile=/dev/null ` +
               `-o StrictHostKeyChecking=no -i ${SshKeyPath} -p ${SshPort} ` +
               `${SshUser}@${SshRemoteHost} ` +
-              `'docker stack rm services || true; sleep 10; docker stack deploy -c ${YamlPath} services'`,
+              `'docker stack rm services || true; sleep 10; docker stack deploy -c ${YamlPath} services || true; sleep 20;'`,
               'Initialise Services',
             ).catch((err) => {
               console.trace('Failed to restart services - aborting this run: ', err);
@@ -192,7 +208,7 @@ const main = async () => {
           for (const sponsor of sponsors) {
             try {
               sponsor.connect(provider);
-              const endpointId = generateConfigJson([]).triggers.rrp[0].endpointId;
+              const endpointId = generateConfigJson( []).triggers.rrp[0].endpointId;
               const sponsorWalletAddress = await deriveSponsorWalletAddress(
                 // NOTE: When doing this manually, you can use the 'derive-airnode-xpub' from the admin CLI package
                 deriveAirnodeXpub(airnodeWallet.mnemonic.phrase),
@@ -296,14 +312,20 @@ const main = async () => {
       cliPrint.info('Deploying Airnode ot AWS...');
       await refreshSecrets(RequestCount);
       const secretsFilePath = join(__dirname, '../aws.env');
+
+      const [gcpCredsMount, gcpCredsEnv ] = getGcpCredentials();
+
       const deployCommand = [
         `docker run -i --rm`,
         `--env-file ${secretsFilePath}`,
+          gcpCredsEnv,
+        gcpCredsMount,
         `-e USER_ID=$(id -u) -e GROUP_ID=$(id -g)`,
         `-v ${join(__dirname, '../')}:/app/config`,
         `-v ${join(__dirname, '..')}:/app/output`,
         `api3/airnode-deployer:latest deploy`,
       ].join(' ');
+	console.log(deployCommand);
 
       await refreshSecrets(RequestCount, InfuraProviderAirnodeOverrideURL);
       try {
