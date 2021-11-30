@@ -265,32 +265,16 @@ HTTP_GATEWAY_API_KEY=${randomUUID()}
 };
 
 /**
- * An enum representing a comms layer between the parent Node process and the Node workers.
+ * During high work loads this application can slow down a host machine considerably. This function tries to set the
+ * process priority so the host machine can be used for other tasks while the tests run in the background.
  */
-export const enum Messages {
-  PING = 'PING',
-  PONG = 'PONG',
-  WORKER_READY = 'WORKER_READY',
-  WORKER_DO_EXIT = 'WORKER_DO_EXIT',
-  WORKER_EXITING = 'WORKER_EXITING',
-  WORKER_DO_REQUEST = 'WORKER_DO_REQUEST',
-  WORKER_REQUEST_RESPONSE = 'WORKER_REQUEST_RESPONSE',
-  WORKER_NONCE = 'WORKER_NONCE',
-  WORKER_ID = 'WORKER_ID',
-  WORKER_DO_WALLET_INIT = 'WORKER_DO_WALLLET_INIT',
-}
-
-/**
- * A convenience function to generate a message for a worker.
- *
- * @param message_action
- * @param data
- */
-export const makeMessage = (message_action: Messages, data: any): any => {
-  return {
-    Action: message_action,
-    event_data: data,
-  };
+export const setPriority = () => {
+  try {
+    // Low priority
+    os.setPriority(18);
+  } catch (e) {
+    //do nothing
+  }
 };
 
 /**

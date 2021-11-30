@@ -104,6 +104,8 @@ For illustration (this is invalid JSON due to comments), the file takes this for
     "PostgresPort": 5432,
     "PostgresDatabase": "airnode"
   },
+  "MaxBatchSize": 10,                                      # Too-big-a-batch of transactions can overload HardHat
+                                                           # 10 seems to be a good number for a t3a.medium EC2 machine
   "RandomLength": 5,                                       # The stress tester generates strings of this length as part
                                                            # of the API requests generated. This only applies to actual
                                                            # EVM implementations (HardHat and OpenEthereum).
@@ -192,11 +194,11 @@ to generate graphs.
 #### Memory Usage:
 
 ```sql
-        SELECT
+        select 
         CONCAT('Runs: ', request_count::text, ' | Test ID:', substring(test_key from 33)) as "Requests Issued",
         (metrics->3->'memory_usage')::integer  as "startCoordinator Duration",
         (metrics->1->'memory_usage')::integer  as "initializeProvider Duration",
-        (metrics->0->'memory_usage')::integer  as "callAPI Duration",
+        (metrics->0->'memory_usage')::integer  as "callAPI Duration", 
         (metrics->2->'memory_usage')::integer  as "processProviderRequests Duration"
         from metrics
         WHERE success = true AND $__timeFilter(run_end)

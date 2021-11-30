@@ -6,8 +6,9 @@ import {
   OutputLogEvent,
 } from '@aws-sdk/client-cloudwatch-logs';
 import { S3Client, ListBucketsCommand } from '@aws-sdk/client-s3';
-import { LogStream } from './types';
-import {contains, doTimeout} from './utils';
+import { LogStream, LogRecord } from './types';
+import {contains, doTimeout, getStressTestConfig} from './utils';
+import {getGCPMetrics} from "./gcp_utils";
 
 /**
  * A sort function to arrange records descending for OutputLogEvents
@@ -33,7 +34,7 @@ const compareDescendingOutputLogEvent = (a: OutputLogEvent, b: OutputLogEvent) =
  * instance will always run multiple times. We therefore want the worst timing and RAM usage of the runs. This finds
  * those values.
  */
-const getGreatestStats = (stats: ({ name: string; duration: number; memory_usage: number } | undefined)[]) => {
+export const getGreatestStats = (stats: ({ name: string; duration: number; memory_usage: number } | undefined)[]) => {
   if (!stats) {
     return { name: '', duration: -1, memory_usage: -1 };
   }
@@ -196,19 +197,19 @@ export const getMetrics = async () => {
  * Tries to retrieve logs from CloudWatch and checks the result for a complete log set.
  */
 export const collectMetrics = async (): Promise<{ metrics: any; success: boolean }> => {
-  for (let i = 0; i < 10000; i++) {
-    await doTimeout(10000);
-    console.log("waiting...", i);
-  }
+  const { CloudProvider } = getStressTestConfig();
+  const isAws = CloudProvider.name === 'aws';
 
   for (let count = 15; count > -1; count--) {
     try {
       await doTimeout(10000);
-      const metrics = await getMetrics();
+      const metrics = isAws ? await getMetrics() : await getGCPMetrics();
       const success =
-        metrics?.filter((record) => record.name.length > 1).length === 4 &&
-        metrics?.filter((record) => record.duration > 10).length === 4 &&
-        metrics?.filter((record) => record.memory_usage > 10).length === 4;
+        metrics?.filter((record: LogRecord) => record.name.length > 1).length === 4 &&
+        metrics?.filter((record: LogRecord) => record.duration > 10).length === 4 &&
+        (
+            (isAws && metrics?.filter((record: LogRecord) => record.memory_usage > 10).length === 4) || !isAws
+        );
 
       if (success || count === 0) {
         return { metrics, success };
