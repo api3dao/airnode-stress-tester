@@ -77,6 +77,7 @@ export interface StressTestConfig {
   Comment?: string;
   CloudProvider: CloudProvider;
   MaxBatchSize?: number;
+  ChainId?: string;
 }
 
 /**

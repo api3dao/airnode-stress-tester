@@ -244,13 +244,15 @@ export const pluralString = (input: number) => (input === 1 ? '' : 's');
  * @param providerOverride an optional provider override URL
  */
 export const refreshSecrets = async (requestCount?: number, providerOverride?: string) => {
+  const {ChainId} = getStressTestConfig();
+  const providerUrl = providerOverride ?
+      providerOverride : getConfiguredProviderURL(getStressTestConfig(), requestCount);
+
   //https://mitm-hardhat.api3mock.link
-  const airnodeSecrets = `PROVIDER_URL=${
-    providerOverride ? providerOverride : getConfiguredProviderURL(getStressTestConfig(), requestCount)
-  }
+  const airnodeSecrets = `PROVIDER_URL=${providerUrl}
 AIRNODE_WALLET_MNEMONIC=${getAirnodeWalletMnemonic()}
 AIRNODE_RRP_ADDRESS=0x5FbDB2315678afecb367f032d93F642f64180aa3
-CHAIN_ID=31337
+CHAIN_ID=${ChainId ? ChainId : 31337}
 CLOUD_PROVIDER_TYPE=local
 HTTP_GATEWAY_API_KEY=${randomUUID()}
 `;
@@ -304,34 +306,4 @@ export const removeAirnode = async () => {
     cliPrint.warning('Failed to remove Airnode, trying again.');
     processSpawn(deployCommand, 'Remove Airnode', 'Error').catch(() => {});
   });
-};
-
-/**
- * This function forms part of the process of spawning Node workers. Initial startup is very slow, but the workers are
- * recycled over multiple test runs. Startup is slow due to no caching of the TS compilation.
- *
- * @param file The TS file to execute
- * @param wkOpts The options handed to the worker
- */
-export const workerTs = (file: string, wkOpts: { workerData: { WorkerNumber: number } }) => {
-  // @ts-ignore
-  wkOpts.eval = true;
-  // @ts-ignore
-  if (!wkOpts.workerData) {
-    // @ts-ignore
-    wkOpts.workerData = {};
-  }
-  // @ts-ignore
-  wkOpts.workerData.__filename = file;
-  return new Worker(
-    `
-            const workerNumber = ${wkOpts.workerData.WorkerNumber};
-            const wk = require('worker_threads');
-            require('ts-node').register();
-            let file = wk.workerData.__filename;
-            delete wk.workerData.__filename;
-            require(file);
-        `,
-    wkOpts
-  );
 };

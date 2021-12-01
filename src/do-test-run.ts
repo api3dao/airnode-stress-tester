@@ -180,8 +180,7 @@ const main = async () => {
                 const receipts = range(WalletCount)
                     .map(() => (USE_SAME_SPONSOR ? masterSponsor : ethers.Wallet.createRandom()))
                     .map((sponsor) => {
-                        // Sometimes HardHat dies due to the load, in this case we slow things down with this *amazing*
-                        // go-like retry system.
+                        // Sometimes HardHat dies due to the load, in this case we slow things down using Bottleneck
                         const chainSetupFunction = async (sponsor: Wallet) => {
                             try {
                                 // await doTimeout(Math.random()*5000);
@@ -209,16 +208,13 @@ const main = async () => {
                                 cliPrint.info(`Waiting for tx to be mined...`);
                                 await tx2.wait();
 
-                                const moddedarrp = airnodeRrp
-                                    .connect(ethers.Wallet.fromMnemonic(sponsor.mnemonic.phrase)
-                                        .connect(provider)) as AirnodeRrp;
+                                const airnodeRrpWithSigner = airnodeRrp
+                                    .connect(sponsor.connect(provider)) as AirnodeRrp;
                                 // Sponsor the requester
                                 cliPrint.info(`Sponsoring requester...`);
-                                await admin.sponsorRequester(
-                                    moddedarrp,
-                                    requester.address,
-                                );
-                                cliPrint.info(`Done sponsoring requester...`);
+
+                                await admin.sponsorRequester(airnodeRrpWithSigner, requester.address);
+
                                 // Trigger the Airnode request
                                 cliPrint.info(`Making a request to sponsor wallet: ${sponsorWalletAddress}`);
                                 const receipt = await requester.makeRequest(
@@ -272,21 +268,19 @@ const main = async () => {
                 });
             }
 
-            // I *really* tried to do this functionally, but it can only be done using .map if the underlying nonces are
-            // sequenced... and it just seems like a ton of effort that won't add anything here.
-            const rrps = Array<ContractsAndRequestsConfig>();
-            for (let i = 0; i < ChainCount; i++) {
-                cliPrint.info(`Deploying contracts for chain ${i}.`);
-                rrps.push(await deployContractAndRequests(i));
-            }
+            const limit = new Bottleneck({
+                maxConcurrent: 1,
+            });
+
+            const rrps = await Promise.all(range(ChainCount).map(async (_, idx) => {
+                return limit.schedule(() => deployContractAndRequests(idx));
+            }));
 
             cliPrint.info('Requests submitted to network, waiting for them to be mined.');
             await refreshConfigJson(rrps);
 
             await doTimeout(10000);
             cliPrint.info('Done waiting for requests to be mined.');
-
-
             cliPrint.info('Deploying Airnode to AWS...');
             await refreshSecrets(RequestCount);
             const secretsFilePath = join(__dirname, '../aws.env');

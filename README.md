@@ -150,6 +150,7 @@ For illustration (this is invalid JSON due to comments), the file takes this for
   "MaxBatchSize": 5                                        # This limits the number of _concurrent_ EVM RPC calls
                                                            # at a high level (ethers may do more calls underneath).
                                                            # HardHat becomes unreliable around 10 concurrent requests.
+  "ChainId": "3"                                           # The Chain ID can be optionally specified
 }
 ```
 

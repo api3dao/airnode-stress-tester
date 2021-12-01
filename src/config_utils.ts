@@ -181,7 +181,8 @@ const templateConfigJson = {
  */
 export const generateConfigJson = (chainRrps: ContractsAndRequestsConfig[]) => {
     const {
-        CloudProvider
+        CloudProvider,
+        ChainId
     } = getStressTestConfig();
     const configSource = deepCopy(templateConfigJson);
     const config = {
@@ -198,7 +199,7 @@ export const generateConfigJson = (chainRrps: ContractsAndRequestsConfig[]) => {
             contracts: {
                 AirnodeRrp: rrp.AirnodeRrpAddress,
             },
-            id: '8995',
+            id: ChainId ? ChainId : 8995,
             providers: {
                 [`provider chain ${idx}`]: {
                     url: '${PROVIDER_URL}',
