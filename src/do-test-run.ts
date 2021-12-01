@@ -1,7 +1,7 @@
 import * as crypto from 'crypto';
 import {existsSync} from 'fs';
 import {join} from 'path';
-import {ethers} from 'ethers';
+import {ethers, Wallet} from 'ethers';
 import * as admin from '@api3/airnode-admin/dist/src/implementation';
 import {AirnodeRrp} from '@api3/airnode-protocol';
 import {range} from 'lodash';
@@ -34,44 +34,11 @@ import {
     getGcpCredentials, setPriority
 } from './';
 import {NonceManager} from "@ethersproject/experimental";
+import Bottleneck from "bottleneck";
 
 process.env.AWS_SDK_LOAD_CONFIG = String(true);
 process.setMaxListeners(2000);
 
-/*
-export const getGcpCredentials = () => {
-  const stressTestConfig = getStressTestConfig();
-  if (stressTestConfig.CloudProvider.name === 'gcp') {
-    return [
-      ` -v ${path.join(os.homedir(), '/.config/gcloud/application_default_credentials.json:/application_default_credentials.json')} `,
-      ' -e "GOOGLE_APPLICATION_CREDENTIALS=/application_default_credentials.json" '
-    ];
-  }
-
-  return [' ', ' '];
-};*/
-
-const splitIntoBatches = (batchSize: number) => {
-
-    return (resultArray: any[], item: any, index: number) => {
-        const chunkIndex = Math.floor(index / batchSize);
-
-        if (!resultArray[chunkIndex]) {
-            resultArray[chunkIndex] = []; // start a new chunk
-        }
-
-        resultArray[chunkIndex].push(item);
-
-        return resultArray;
-    };
-
-};
-
-
-/**
- * The main function acts as the parent process in the multi-threaded cluster.
- * This function only executed if isMainThread is true.
- */
 const main = async () => {
     const stressTestConfig = getStressTestConfig();
 
@@ -86,12 +53,15 @@ const main = async () => {
     } = getStressTestConfig();
     const {SshKeyPath, SshRemoteHost, SshUser, SshPort, YamlPath} = SshConfig;
 
-    const MaxBatchSize = (() => {
+    /*
+    HardHat gets unhappy if you hit it with more than 10 RPC calls simultaneously.
+     */
+    const maxBatchSize = (() => {
         if (stressTestConfig.MaxBatchSize) {
             return stressTestConfig.MaxBatchSize
         }
 
-        return 10;
+        return 5;
     })();
 
     if (contains(SshRemoteHost, 'local') && !(SshRemoteHost && SshUser && SshPort && SshKeyPath)) {
@@ -177,6 +147,11 @@ const main = async () => {
             }
 
             const deployContractAndRequests = async (chainNumber: number): Promise<ContractsAndRequestsConfig> => {
+                const limit = new Bottleneck({
+                    maxConcurrent: maxBatchSize,
+                });
+                const endpointId = generateConfigJson([]).triggers.rrp[0].endpointId;
+
                 if (TestType === 'HardHatProvider') {
                     provider.send('evm_mine', []).catch((e) => {
                         console.trace('Mine block failed', e);
@@ -195,82 +170,77 @@ const main = async () => {
                 airnodeWallet.connect(provider);
                 const masterSponsor = ethers.Wallet.fromMnemonic(getIntegrationInfo().mnemonic).connect(provider);
                 const nMSponsor = new NonceManager(masterSponsor);
-                // const airnodeWalletManaged = new NonceManager(airnodeWallet).connect(provider);
+
                 const requester = await deployContract(getIntegrationInfo(),
                     `contracts/Requester.sol`,
                     chainNumber, [airnodeRrp.address],
                     nMSponsor);
                 const USE_SAME_SPONSOR = false;
 
-                const endpointId = generateConfigJson([]).triggers.rrp[0].endpointId;
-                // TODO This is slow and can be sped up a lot.
-
                 const receipts = range(WalletCount)
                     .map(() => (USE_SAME_SPONSOR ? masterSponsor : ethers.Wallet.createRandom()))
-                    .map(async (sponsor) => {
-                        try {
-                            sponsor.connect(provider);
-                            const sponsorWalletAddress = await deriveSponsorWalletAddress(
-                                // NOTE: When doing this manually, you can use the 'derive-airnode-xpub' from the admin CLI package
-                                deriveAirnodeXpub(airnodeWallet.mnemonic.phrase),
-                                airnodeWallet.address,
-                                sponsor.address,
-                            );
-                            cliPrint.info(`Derived Sponsor Wallet Address ${sponsorWalletAddress}`);
-                            // Fund the sponsor wallet
-                            const tx1 = await nMSponsor.sendTransaction({
-                                to: sponsorWalletAddress,
-                                value: ethers.utils.parseEther('0.1'),
-                            });
-                            cliPrint.info(`Sent tx to fund sponsor wallet, waiting for tx to be mined...`);
-                            await tx1.wait();
-                            cliPrint.info(`Tx mined, moving on to funding sponsor.`);
-                            // Fund the sponsor
-                            const tx2 = await nMSponsor.sendTransaction({
-                                to: sponsor.address,
-                                value: ethers.utils.parseEther('0.1'),
-                            });
-                            cliPrint.info(`Waiting for tx to be mined...`);
-                            await tx2.wait();
+                    .map((sponsor) => {
+                        // Sometimes HardHat dies due to the load, in this case we slow things down with this *amazing*
+                        // go-like retry system.
+                        const chainSetupFunction = async (sponsor: Wallet) => {
+                            try {
+                                // await doTimeout(Math.random()*5000);
+                                sponsor.connect(provider);
+                                const sponsorWalletAddress = await deriveSponsorWalletAddress(
+                                    // NOTE: When doing this manually, you can use the 'derive-airnode-xpub' from the admin CLI package
+                                    deriveAirnodeXpub(airnodeWallet.mnemonic.phrase),
+                                    airnodeWallet.address,
+                                    sponsor.address,
+                                );
+                                cliPrint.info(`Derived Sponsor Wallet Address ${sponsorWalletAddress}`);
+                                // Fund the sponsor wallet
+                                const tx1 = await nMSponsor.sendTransaction({
+                                    to: sponsorWalletAddress,
+                                    value: ethers.utils.parseEther('0.1'),
+                                });
+                                cliPrint.info(`Sent tx to fund sponsor wallet, waiting for tx to be mined...`);
+                                await tx1.wait();
+                                cliPrint.info(`Tx mined, moving on to funding sponsor.`);
+                                // Fund the sponsor
+                                const tx2 = await nMSponsor.sendTransaction({
+                                    to: sponsor.address,
+                                    value: ethers.utils.parseEther('0.1'),
+                                });
+                                cliPrint.info(`Waiting for tx to be mined...`);
+                                await tx2.wait();
 
-                            const moddedarrp = airnodeRrp
-                                .connect(ethers.Wallet.fromMnemonic(sponsor.mnemonic.phrase)
-                                    .connect(provider)) as AirnodeRrp;
-                            // Sponsor the requester
-                            cliPrint.info(`Sponsoring requester...`);
-                            await admin.sponsorRequester(
-                                moddedarrp,
-                                requester.address,
-                            );
-                            cliPrint.info(`Done sponsoring requester...`);
-                            // Trigger the Airnode request
-                            cliPrint.info(`Making a request to sponsor wallet: ${sponsorWalletAddress}`);
-                            const receipt = await requester.makeRequest(
-                                airnodeWallet.address,
-                                endpointId,
-                                sponsor.address,
-                                sponsorWalletAddress,
-                                getEncodedParameters(generateRandomString(5))
-                            );
-                            cliPrint.info(`Made request, receipt: ${receipt.hash}`);
+                                const moddedarrp = airnodeRrp
+                                    .connect(ethers.Wallet.fromMnemonic(sponsor.mnemonic.phrase)
+                                        .connect(provider)) as AirnodeRrp;
+                                // Sponsor the requester
+                                cliPrint.info(`Sponsoring requester...`);
+                                await admin.sponsorRequester(
+                                    moddedarrp,
+                                    requester.address,
+                                );
+                                cliPrint.info(`Done sponsoring requester...`);
+                                // Trigger the Airnode request
+                                cliPrint.info(`Making a request to sponsor wallet: ${sponsorWalletAddress}`);
+                                const receipt = await requester.makeRequest(
+                                    airnodeWallet.address,
+                                    endpointId,
+                                    sponsor.address,
+                                    sponsorWalletAddress,
+                                    getEncodedParameters(generateRandomString(5))
+                                );
+                                cliPrint.info(`Made request, receipt: ${receipt.hash}`);
 
-                            return receipt;
-                        } catch (e) {
-                            console.trace(e);
-                        }
+                                return receipt;
+                            } catch (e) {
+                                console.trace(e);
+                            }
+                        };
 
-                        // ids.push(
-                        //   await new Promise<string>((resolve) =>
-                        //     provider.once(receipt.hash, (tx) => {
-                        //       const parsedLog = airnodeRrp.interface.parseLog(tx.logs[0]);
-                        //       resolve(parsedLog.args.requestId);
-                        //     })
-                        //   )
-                        // );
+                        return limit.schedule(() => chainSetupFunction(sponsor));
                     });
-                console.log("Waiting for receipts to resolve...");
+                cliPrint.info("Waiting for receipts to resolve...");
                 await Promise.all(receipts);
-                console.log("Receipts resolved.");
+                cliPrint.info("Receipts resolved.");
                 cliPrint.info('Done initialising chain services, moving on to executing requests...');
 
                 const confData = {
@@ -306,6 +276,7 @@ const main = async () => {
             // sequenced... and it just seems like a ton of effort that won't add anything here.
             const rrps = Array<ContractsAndRequestsConfig>();
             for (let i = 0; i < ChainCount; i++) {
+                cliPrint.info(`Deploying contracts for chain ${i}.`);
                 rrps.push(await deployContractAndRequests(i));
             }
 
@@ -332,7 +303,7 @@ const main = async () => {
                 `-v ${join(__dirname, '..')}:/app/output`,
                 `api3/airnode-deployer:latest deploy`,
             ].join(' ');
-            console.log(deployCommand);
+            cliPrint.info(deployCommand);
 
             await refreshSecrets(RequestCount, InfuraProviderAirnodeOverrideURL);
             try {

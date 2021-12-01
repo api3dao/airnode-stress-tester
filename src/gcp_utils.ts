@@ -19,8 +19,6 @@ export const getGCPMetrics = async ()  :Promise<LogRecord[]> => {
     I tried using GCP's SDK... it's a nightmare; poorly documented and difficult to work with.
     I eventually settled on calling the gcloud cli app.
      */
-    const {CloudProvider} = getStressTestConfig();
-    const {projectId} = CloudProvider;
 
     const gFunctionsOutput = spawnSync(`bash`, [`-c`, `gcloud beta functions list --format=json`])
         .output.toString(); // output starts with a ',' for some reason and also ends with ','
@@ -48,7 +46,7 @@ export const getGCPMetrics = async ()  :Promise<LogRecord[]> => {
                 `bash`,
                 [`-c`, `gcloud beta functions logs read "${gf}" --filter "time_utc > \"${
                     new Date((Date.now() - (2 + 120) * 60 * 1000)).toISOString()
-                }\"" --region us-east4 --format=json`])
+                }\"" --region us-east4 --limit=1000 --format=json`])
                 .output
                 .toString();
             return JSON.parse(trimGCloudOutput(gcloudProc));

@@ -192,7 +192,7 @@ export const generateConfigJson = (chainRrps: ContractsAndRequestsConfig[]) => {
         }
     };
 
-    const chains = chainRrps.map((rrp) => {
+    const chains = chainRrps.map((rrp, idx) => {
         return {
             authorizers: [],
             contracts: {
@@ -200,14 +200,14 @@ export const generateConfigJson = (chainRrps: ContractsAndRequestsConfig[]) => {
             },
             id: '8995',
             providers: {
-                exampleProvider: {
+                [`provider chain ${idx}`]: {
                     url: '${PROVIDER_URL}',
-                },
+                }
             },
             type: 'evm',
         };
     });
 
-    console.log(JSON.stringify(config, null, 2));
+    console.log(JSON.stringify({...config, chains}, null, 2));
     return {...config, chains};
 };

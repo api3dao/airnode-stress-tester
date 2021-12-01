@@ -1,4 +1,5 @@
 import { AttemptOptions, retry, sleep } from '@lifeomic/attempt';
+import {doTimeout} from "./utils";
 
 // From https://github.com/api3dao/airnode/blob/e50dafe57a0a083fd9fc3b2816fe8352a673038d/packages/airnode-node/src/utils/promise-utils.ts#L23
 // The default amount of time before a "retryable" promise is timed out and retried
