@@ -163,18 +163,15 @@ const main = async () => {
                     '@api3/airnode-protocol/contracts/rrp/AirnodeRrp.sol',
                     chainNumber
                 );
-                airnodeRrp.connect(provider);
                 cliPrint.info(`AirnodeRrp deployed to address: ${airnodeRrp.address}`);
 
-                const airnodeWallet = getAirnodeWallet();
-                airnodeWallet.connect(provider);
+                const airnodeWallet = getAirnodeWallet().connect(provider);
                 const masterSponsor = ethers.Wallet.fromMnemonic(getIntegrationInfo().mnemonic).connect(provider);
                 const nMSponsor = new NonceManager(masterSponsor);
 
                 const requester = await deployContract(getIntegrationInfo(),
                     `contracts/Requester.sol`,
-                    chainNumber, [airnodeRrp.address],
-                    nMSponsor);
+                    chainNumber, [airnodeRrp.address], nMSponsor);
                 const USE_SAME_SPONSOR = false;
 
                 const receipts = range(WalletCount)
@@ -211,7 +208,11 @@ const main = async () => {
                                 // Sponsor the requester
                                 cliPrint.info(`Sponsoring requester...`);
 
-                                await admin.sponsorRequester(airnodeRrpWithSigner, requester.address);
+                                const tx3 =
+                                    await airnodeRrpWithSigner.setSponsorshipStatus(requester.address, true);
+                                if (ropstenProvider) {
+                                    await tx3.wait(1);
+                                }
 
                                 // Trigger the Airnode request
                                 cliPrint.info(`Making a request to sponsor wallet: ${sponsorWalletAddress}`);
