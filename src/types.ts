@@ -41,6 +41,18 @@ export interface RequestSet {
   ChainCount: number;
 }
 
+/**
+ * A uniform type for a LogRecord from GCP and AWS - suitable for metrics processing.
+ */
+export interface LogRecord {
+  name: string;
+  duration: number;
+  memory_usage: number;
+}
+
+/**
+ * Cloud Provider configuration - a near-copy of Airnode's config.json type.
+ */
 export interface CloudProvider {
   name: 'aws' | 'gcp';
   projectId: string;
@@ -64,6 +76,8 @@ export interface StressTestConfig {
   InfuraProviderAirnodeOverrideURL?: string;
   Comment?: string;
   CloudProvider: CloudProvider;
+  MaxBatchSize?: number;
+  ChainId?: string;
 }
 
 /**

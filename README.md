@@ -55,6 +55,14 @@ Two service stacks run on the machine:
 You'll have to build these images, eg: `docker-compose build` You may also wish to push/pull them to a repository:
 `docker-compose push/pull`
 
+## Additional Dependencies
+Unfortunately, Google's Cloud Function Logging documentation (which is a sepaerate subsystem to GCP's main logging
+system - although some Cloud Function events are logged in this system) is poorly documented. This application has
+taken to using the `gcloud` tool to retrieve logs - it was the best trade-off.
+
+You'll therefore need the `gcloud` utility installed as well as authenticated as this application will use your home
+folder-based GCP credentials to do a lot of its work.
+
 ## Configuration
 
 The EC2 instance must have this repository cloned such that it resides in `/home/ubuntu/`, eg. `/home/ubuntu/airnode`.
@@ -63,7 +71,7 @@ exploitable.
 
 The stress tester requires the local AWS SDK to have functional credentials. I tested with a root AWS account.
 
-Configuration for the Stress Tester is stored in stressconfig.json in this folder.
+Configuration for the Stress Tester is stored in `stressconfig.json` in this folder.
 
 For illustration (this is invalid JSON due to comments), the file takes this form:
 
@@ -104,6 +112,8 @@ For illustration (this is invalid JSON due to comments), the file takes this for
     "PostgresPort": 5432,
     "PostgresDatabase": "airnode"
   },
+  "MaxBatchSize": 10,                                      # Too-big-a-batch of transactions can overload HardHat
+                                                           # 10 seems to be a good number for a t3a.medium EC2 machine
   "RandomLength": 5,                                       # The stress tester generates strings of this length as part
                                                            # of the API requests generated. This only applies to actual
                                                            # EVM implementations (HardHat and OpenEthereum).
@@ -136,6 +146,11 @@ For illustration (this is invalid JSON due to comments), the file takes this for
                                                            
                                                            # This parameter is optional.
   "InfuraProviderAirnodeOverrideURL": "https://ropsten.infura.io/v3/18d2f6eedb334abb8389f67a652790ec"
+
+  "MaxBatchSize": 5                                        # This limits the number of _concurrent_ EVM RPC calls
+                                                           # at a high level (ethers may do more calls underneath).
+                                                           # HardHat becomes unreliable around 10 concurrent requests.
+  "ChainId": "3"                                           # The Chain ID can be optionally specified
 }
 ```
 
@@ -192,11 +207,11 @@ to generate graphs.
 #### Memory Usage:
 
 ```sql
-        SELECT
+        select 
         CONCAT('Runs: ', request_count::text, ' | Test ID:', substring(test_key from 33)) as "Requests Issued",
         (metrics->3->'memory_usage')::integer  as "startCoordinator Duration",
         (metrics->1->'memory_usage')::integer  as "initializeProvider Duration",
-        (metrics->0->'memory_usage')::integer  as "callAPI Duration",
+        (metrics->0->'memory_usage')::integer  as "callAPI Duration", 
         (metrics->2->'memory_usage')::integer  as "processProviderRequests Duration"
         from metrics
         WHERE success = true AND $__timeFilter(run_end)

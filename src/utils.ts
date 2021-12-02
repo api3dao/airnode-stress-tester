@@ -9,6 +9,7 @@ import { ContractsAndRequestsConfig, IntegrationInfo, StressTestConfig } from '.
 import { generateConfigJson } from './config_utils';
 import { cliPrint } from './cli';
 import { getAirnodeWalletMnemonic } from './chain';
+import {DEFAULT_CHAIN_ID} from "./constants";
 
 export const getGcpCredentials = () => {
   const stressTestConfig = getStressTestConfig();
@@ -244,13 +245,15 @@ export const pluralString = (input: number) => (input === 1 ? '' : 's');
  * @param providerOverride an optional provider override URL
  */
 export const refreshSecrets = async (requestCount?: number, providerOverride?: string) => {
+  const {ChainId} = getStressTestConfig();
+  const providerUrl = providerOverride ?
+      providerOverride : getConfiguredProviderURL(getStressTestConfig(), requestCount);
+
   //https://mitm-hardhat.api3mock.link
-  const airnodeSecrets = `PROVIDER_URL=${
-    providerOverride ? providerOverride : getConfiguredProviderURL(getStressTestConfig(), requestCount)
-  }
+  const airnodeSecrets = `PROVIDER_URL=${providerUrl}
 AIRNODE_WALLET_MNEMONIC=${getAirnodeWalletMnemonic()}
 AIRNODE_RRP_ADDRESS=0x5FbDB2315678afecb367f032d93F642f64180aa3
-CHAIN_ID=31337
+CHAIN_ID=${ChainId ? ChainId : DEFAULT_CHAIN_ID}
 CLOUD_PROVIDER_TYPE=local
 HTTP_GATEWAY_API_KEY=${randomUUID()}
 `;
@@ -265,32 +268,16 @@ HTTP_GATEWAY_API_KEY=${randomUUID()}
 };
 
 /**
- * An enum representing a comms layer between the parent Node process and the Node workers.
+ * During high work loads this application can slow down a host machine considerably. This function tries to set the
+ * process priority so the host machine can be used for other tasks while the tests run in the background.
  */
-export const enum Messages {
-  PING = 'PING',
-  PONG = 'PONG',
-  WORKER_READY = 'WORKER_READY',
-  WORKER_DO_EXIT = 'WORKER_DO_EXIT',
-  WORKER_EXITING = 'WORKER_EXITING',
-  WORKER_DO_REQUEST = 'WORKER_DO_REQUEST',
-  WORKER_REQUEST_RESPONSE = 'WORKER_REQUEST_RESPONSE',
-  WORKER_NONCE = 'WORKER_NONCE',
-  WORKER_ID = 'WORKER_ID',
-  WORKER_DO_WALLET_INIT = 'WORKER_DO_WALLLET_INIT',
-}
-
-/**
- * A convenience function to generate a message for a worker.
- *
- * @param message_action
- * @param data
- */
-export const makeMessage = (message_action: Messages, data: any): any => {
-  return {
-    Action: message_action,
-    event_data: data,
-  };
+export const setPriority = () => {
+  try {
+    // Low priority
+    os.setPriority(18);
+  } catch (e) {
+    //do nothing
+  }
 };
 
 /**
@@ -320,34 +307,4 @@ export const removeAirnode = async () => {
     cliPrint.warning('Failed to remove Airnode, trying again.');
     processSpawn(deployCommand, 'Remove Airnode', 'Error').catch(() => {});
   });
-};
-
-/**
- * This function forms part of the process of spawning Node workers. Initial startup is very slow, but the workers are
- * recycled over multiple test runs. Startup is slow due to no caching of the TS compilation.
- *
- * @param file The TS file to execute
- * @param wkOpts The options handed to the worker
- */
-export const workerTs = (file: string, wkOpts: { workerData: { WorkerNumber: number } }) => {
-  // @ts-ignore
-  wkOpts.eval = true;
-  // @ts-ignore
-  if (!wkOpts.workerData) {
-    // @ts-ignore
-    wkOpts.workerData = {};
-  }
-  // @ts-ignore
-  wkOpts.workerData.__filename = file;
-  return new Worker(
-    `
-            const workerNumber = ${wkOpts.workerData.WorkerNumber};
-            const wk = require('worker_threads');
-            require('ts-node').register();
-            let file = wk.workerData.__filename;
-            delete wk.workerData.__filename;
-            require(file);
-        `,
-    wkOpts
-  );
 };

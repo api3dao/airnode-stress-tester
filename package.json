@@ -13,6 +13,7 @@
   "description": "A stress tester for Airnode",
   "scripts": {
     "do-test-run": "ts-node src/do-test-run.ts",
+    "logging-poc": "ts-node src/gcp_utils.ts",
     "stack-trace-parse": "ts-node src/stack-trace-parse.ts"
   },
   "devDependencies": {
@@ -51,6 +52,11 @@
     "typescript": "^4.3.5"
   },
   "dependencies": {
-    "googleapis": "^91.0.0"
+    "@ethersproject/experimental": "^5.5.0",
+    "@google-cloud/functions": "^1.2.0",
+    "@google-cloud/logging": "^9.6.3",
+    "bottleneck": "^2.19.5",
+    "googleapis": "^91.0.0",
+    "lodash": "^4.17.21"
   }
 }

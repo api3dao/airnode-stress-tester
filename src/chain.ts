@@ -2,10 +2,9 @@ import { join } from 'path';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs';
 import { ethers } from 'ethers';
 import { encode } from '@api3/airnode-abi';
-import { ContractsAndRequestsConfig, IntegrationInfo } from './types';
-import { deriveAirnodeXpub, deriveSponsorWalletAddress } from './evm';
-import { generateRandomString, removeExtension } from './utils';
-import { cliPrint } from './cli';
+import { IntegrationInfo } from './types';
+import { removeExtension } from './utils';
+import {NonceManager} from "@ethersproject/experimental";
 
 export const deploymentPath = join(__dirname, '../docker-poa-network.json');
 
@@ -50,79 +49,8 @@ export const getArtifact = (artifactsFolderPath: string) => {
  * @returns encodedParams airnode-abi encoded parameters
  * @param coin
  */
-export const getEncodedParameters = (coin: string) => encode([{ name: 'coinId', type: 'bytes32', value: coin }]);
-
-/**
- * Executes a request against a set of services represented by the arguments.
- * Nonce sequencing is necessary to avoid overlapping transactions.
- * This call can take a long time, so execution is divved up over multiple Node WORKERs.
- *
- * @param confData An airnodeRrp deployment dictionary
- * @param integrationInfo Integration Info
- * @param nonce We sequence the nonces so we can queue up multiple transactions per block/
- * @param RandomLength The length of the random string sent as a parameter in the request.
- * @param mnemonic The sponsor wallet mnemonic
- * @param deploymentNumber The AirnodeRrp deployment index - used to get artifacts
- */
-export const makeRequest = async (
-  confData: ContractsAndRequestsConfig,
-  integrationInfo: IntegrationInfo,
-  nonce: Number,
-  RandomLength: number,
-  mnemonic?: string,
-  deploymentNumber?: number
-) => {
-  const overrideOptions = { nonce: nonce };
-  const airnodeWallet = ethers.Wallet.fromMnemonic(confData.AirnodeMnemonic);
-  const sponsor = ethers.Wallet.fromMnemonic(mnemonic ? mnemonic : integrationInfo.mnemonic);
-
-  const requester = await getDeployedContract(
-    integrationInfo,
-    `contracts/Requester.sol`,
-    deploymentNumber,
-    sponsor.mnemonic.phrase
-  );
-  const endpointId = JSON.parse(readFileSync(join(__dirname, `../config.json`)).toString()).triggers.rrp[0].endpointId;
-
-  const sponsorWalletAddress = await deriveSponsorWalletAddress(
-    deriveAirnodeXpub(airnodeWallet.mnemonic.phrase),
-    airnodeWallet.address,
-    sponsor.address
-  );
-
-  cliPrint.info(
-    `Make request parameters
-    ${JSON.stringify(
-      {
-        'airnode wallet address': airnodeWallet.address,
-        'Endpoint ID': endpointId,
-        'Sponsor address': sponsor.address,
-        'Sponsor wallet address': sponsorWalletAddress,
-        'Encoded parameters': getEncodedParameters(generateRandomString(RandomLength)),
-        overrideOptions,
-      },
-      null,
-      2
-    )}`
-  );
-
-  try {
-    await requester.makeRequest(
-      airnodeWallet.address,
-      endpointId,
-      sponsor.address,
-      sponsorWalletAddress,
-      getEncodedParameters(generateRandomString(RandomLength)),
-      overrideOptions
-    );
-    cliPrint.info(
-      `Transaction successful: Sponsor (${sponsor.address} ${sponsorWalletAddress}) ` +
-        `Requester (${requester.address})`
-    );
-  } catch (e) {
-    console.trace('Make Request failed', e);
-  }
-};
+export const getEncodedParameters = (coin: string) =>
+    encode([{ name: 'coinId', type: 'bytes32', value: coin }]);
 
 /**
  * Deploys the contract specified by the path to the artifact and constructor arguments. This method will also write the
@@ -132,13 +60,15 @@ export const makeRequest = async (
  * @param artifactsFolderPath
  * @param args Arguments for the contract constructor to be deployed
  * @param deploymentNumber
+ * @param wallet
  * @returns The deployed contract
  */
 export const deployContract = async (
   integrationInfo: IntegrationInfo,
   artifactsFolderPath: string,
   deploymentNumber = 0,
-  args: any[] = []
+  args: any[] = [],
+  wallet?: ethers.Wallet | NonceManager
 ) => {
   const artifact = getArtifact(artifactsFolderPath);
 
@@ -146,7 +76,7 @@ export const deployContract = async (
   const contractFactory = new ethers.ContractFactory(
     artifact.abi,
     artifact.bytecode,
-    await getUserWallet(integrationInfo)
+    wallet? wallet : await getUserWallet(integrationInfo)
   );
   const contract = await contractFactory.deploy(...args);
   await contract.deployed();

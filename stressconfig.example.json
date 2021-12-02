@@ -78,5 +78,10 @@
   },
   "RandomLength": 5,
   "TestType": "HardHatProvider",
-  "Comment": "1384 MB no traces"
+  "Comment": "1384 MB no traces",
+  "CloudProvider": {
+    "name": "gcp",
+    "region": "us-east4",
+    "projectId": "api3-333218"
+  }
 }
