@@ -9,6 +9,7 @@ import { ContractsAndRequestsConfig, IntegrationInfo, StressTestConfig } from '.
 import { generateConfigJson } from './config_utils';
 import { cliPrint } from './cli';
 import { getAirnodeWalletMnemonic } from './chain';
+import {DEFAULT_CHAIN_ID} from "./constants";
 
 export const getGcpCredentials = () => {
   const stressTestConfig = getStressTestConfig();
@@ -252,7 +253,7 @@ export const refreshSecrets = async (requestCount?: number, providerOverride?: s
   const airnodeSecrets = `PROVIDER_URL=${providerUrl}
 AIRNODE_WALLET_MNEMONIC=${getAirnodeWalletMnemonic()}
 AIRNODE_RRP_ADDRESS=0x5FbDB2315678afecb367f032d93F642f64180aa3
-CHAIN_ID=${ChainId ? ChainId : 31337}
+CHAIN_ID=${ChainId ? ChainId : DEFAULT_CHAIN_ID}
 CLOUD_PROVIDER_TYPE=local
 HTTP_GATEWAY_API_KEY=${randomUUID()}
 `;

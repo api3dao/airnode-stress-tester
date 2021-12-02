@@ -1,6 +1,7 @@
 import {deepCopy} from 'ethers/lib/utils';
 import {ContractsAndRequestsConfig, StressTestConfig} from './types';
 import {getStressTestConfig} from "./utils";
+import {DEFAULT_CHAIN_ID} from "./constants";
 
 const templateConfigJson = {
     chains: [
@@ -199,7 +200,7 @@ export const generateConfigJson = (chainRrps: ContractsAndRequestsConfig[]) => {
             contracts: {
                 AirnodeRrp: rrp.AirnodeRrpAddress,
             },
-            id: ChainId ? ChainId : 8995,
+            id: (ChainId ? ChainId : DEFAULT_CHAIN_ID).toString(10),
             providers: {
                 [`provider chain ${idx}`]: {
                     url: '${PROVIDER_URL}',

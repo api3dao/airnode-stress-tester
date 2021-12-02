@@ -1,1 +1,1 @@
-{"integration":"coingecko-testable","airnodeType":"local","network":"docker-poa-network","mnemonic":"test test test test test test test test test test test junk","providerUrl":"https://hardhat.api3mock.link"}
+{"integration":"coingecko-testable","airnodeType":"local","network":"docker-poa-network","mnemonic":"test test test test test test test test test test test junk"}

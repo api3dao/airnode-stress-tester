@@ -178,13 +178,11 @@ const main = async () => {
                 const USE_SAME_SPONSOR = false;
 
                 const receipts = range(WalletCount)
-                    .map(() => (USE_SAME_SPONSOR ? masterSponsor : ethers.Wallet.createRandom()))
+                    .map(() => (USE_SAME_SPONSOR ? masterSponsor : ethers.Wallet.createRandom().connect(provider)))
                     .map((sponsor) => {
                         // Sometimes HardHat dies due to the load, in this case we slow things down using Bottleneck
                         const chainSetupFunction = async (sponsor: Wallet) => {
                             try {
-                                // await doTimeout(Math.random()*5000);
-                                sponsor.connect(provider);
                                 const sponsorWalletAddress = await deriveSponsorWalletAddress(
                                     // NOTE: When doing this manually, you can use the 'derive-airnode-xpub' from the admin CLI package
                                     deriveAirnodeXpub(airnodeWallet.mnemonic.phrase),
