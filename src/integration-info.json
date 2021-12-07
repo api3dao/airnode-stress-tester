@@ -1,1 +1,6 @@
-{"integration":"coingecko-testable","airnodeType":"local","network":"docker-poa-network","mnemonic":"test test test test test test test test test test test junk"}
+{
+  "integration": "coingecko-testable",
+  "airnodeType": "local",
+  "network": "docker-poa-network",
+  "mnemonic": "test test test test test test test test test test test junk"
+}

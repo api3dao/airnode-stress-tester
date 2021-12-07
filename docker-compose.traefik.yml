@@ -50,20 +50,19 @@ services:
       - traefik-web
       - databases
     environment:
-      - "GF_INSTALL_PLUGINS=https://github.com/chartwerk/grafana-chartwerk-app/archive/0.3.3.zip;corpglory-chartwerk-panel"
+      - 'GF_INSTALL_PLUGINS=https://github.com/chartwerk/grafana-chartwerk-app/archive/0.3.3.zip;corpglory-chartwerk-panel'
     stop_signal: SIGINT
     stop_grace_period: 20s
-    user: "1000"
+    user: '1000'
     deploy:
       labels:
-        - "traefik.enable=true"
-        - "traefik.http.routers.grafana.rule=Host(`grafana.api3mock.link`)"
-        - "traefik.http.routers.grafana.entrypoints=web"
-        - "traefik.http.services.grafana.loadbalancer.server.port=3000" # it seems you always need to give traefik a port so it 'notices' the service
-        - "traefik.http.routers.grafana-secured.rule=Host(`grafana.api3mock.link`)"
-        - "traefik.http.routers.grafana-secured.entrypoints=web-secured"
-        - "traefik.http.routers.grafana-secured.tls.certresolver=mytlschallenge"
-
+        - 'traefik.enable=true'
+        - 'traefik.http.routers.grafana.rule=Host(`grafana.api3mock.link`)'
+        - 'traefik.http.routers.grafana.entrypoints=web'
+        - 'traefik.http.services.grafana.loadbalancer.server.port=3000' # it seems you always need to give traefik a port so it 'notices' the service
+        - 'traefik.http.routers.grafana-secured.rule=Host(`grafana.api3mock.link`)'
+        - 'traefik.http.routers.grafana-secured.entrypoints=web-secured'
+        - 'traefik.http.routers.grafana-secured.tls.certresolver=mytlschallenge'
 
 networks:
   traefik-web:

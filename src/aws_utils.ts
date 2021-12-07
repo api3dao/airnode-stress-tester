@@ -5,69 +5,9 @@ import {
   GetLogEventsCommand,
   OutputLogEvent,
 } from '@aws-sdk/client-cloudwatch-logs';
-import { S3Client, ListBucketsCommand } from '@aws-sdk/client-s3';
-import { LogStream, LogRecord } from './types';
-import {contains, doTimeout, getStressTestConfig} from './utils';
-import {getGCPMetrics} from "./gcp_utils";
-
-/**
- * A sort function to arrange records descending for OutputLogEvents
- */
-const compareDescendingOutputLogEvent = (a: OutputLogEvent, b: OutputLogEvent) => {
-  if (!a.timestamp || !b.timestamp) {
-    return 0; //shoudn't be possible
-  }
-
-  if (a.timestamp > b.timestamp) {
-    return -1;
-  }
-
-  if (a.timestamp < b.timestamp) {
-    return 1;
-  }
-
-  return 0;
-};
-
-/**
- * It is possible for multiple runs of various handlers to occur in the time period being assessed - `callApi`, for
- * instance will always run multiple times. We therefore want the worst timing and RAM usage of the runs. This finds
- * those values.
- */
-export const getGreatestStats = (stats: ({ name: string; duration: number; memory_usage: number } | undefined)[]) => {
-  if (!stats) {
-    return { name: '', duration: -1, memory_usage: -1 };
-  }
-  //({name: string, duration: number, memory_usage: number}
-  // can use a factory function... later
-  const maxDuration = stats.reduce((accu, cv) => {
-    if (!cv) {
-      return accu;
-    }
-
-    if (cv.duration > accu) {
-      return cv.duration;
-    }
-
-    return accu;
-  }, 0);
-
-  const maxMemory = stats.reduce((accu, cv) => {
-    if (!cv) {
-      return accu;
-    }
-
-    if (cv.memory_usage > accu) {
-      return cv.memory_usage;
-    }
-
-    return accu;
-  }, 0);
-
-  const name = stats[0]?.name ? stats[0]?.name : '';
-
-  return { name: name, duration: maxDuration, memory_usage: maxMemory };
-};
+import { LogStream } from './types';
+import { contains } from './utils';
+import { getGreatestStats } from './metrics_utils';
 
 /**
  * Gets the LogGroupName from the arn.
@@ -186,112 +126,17 @@ export const getMetrics = async () => {
       eventOccured('Runtime exited with error');
 
     // TODO we're appending all logs, only append relevant
-    const merged = { ...thisRound, ...{ logs: value, timedOut: didTimeout, failed: didFail, fulfilledRequestsCount } };
+    const merged = {
+      ...thisRound,
+      ...{
+        logs: value,
+        timedOut: didTimeout,
+        failed: didFail,
+        fulfilledRequestsCount,
+      },
+    };
     metrics.push(merged);
   }
 
   return metrics;
-};
-
-/**
- * Tries to retrieve logs from CloudWatch and checks the result for a complete log set.
- */
-export const collectMetrics = async (): Promise<{ metrics: any; success: boolean }> => {
-  const { CloudProvider } = getStressTestConfig();
-  const isAws = CloudProvider.name === 'aws';
-
-  for (let count = 15; count > -1; count--) {
-    try {
-      await doTimeout(10000);
-      const metrics = isAws ? await getMetrics() : await getGCPMetrics();
-      const success =
-        metrics?.filter((record: LogRecord) => record.name.length > 1).length === 4 &&
-        metrics?.filter((record: LogRecord) => record.duration > 10).length === 4 &&
-        (
-            (isAws && metrics?.filter((record: LogRecord) => record.memory_usage > 10).length === 4) || !isAws
-        );
-
-      if (success || count === 0) {
-        return { metrics, success };
-      }
-    } catch (e) {
-      console.trace(`Attempt ${count} failed: `, e);
-    }
-  }
-
-  return { metrics: [], success: false };
-};
-
-/**
- * [WIP] A last-ditch effort to clean up an Airnode AWS deployment.
- * This is incomplete, but I'm leaving it here as it contains my research into using the AWS SDK to effect the above.
- *
- * Sometimes the deployer leaves behind an incomplete installation (usually due to being interrupted/typeical BZFT
- * problem). In these scenarios manual removal is needed. This is unacceptable for the stress tester as it needs to run
- * autonomously. This function will deal with that... eventually.
- */
-const _cleanAWSInstallation = async () => {
-  const promises = [];
-  const s3client = new S3Client({ region: 'us-east-1' });
-  const deleteBuckets = async (triesRemaining?: number) => {
-    return s3client
-      .send(new ListBucketsCommand({}))
-      .then((listBucketsCommandResults) => {
-        listBucketsCommandResults.Buckets?.flatMap((bucket) => {
-          if (contains(bucket.Name, 'airnode')) {
-            // list objects in bucket, delete all objects in bucket, delete bucket
-            // s3 bucket follows form airnode-shortcode-dev-terraform
-            // dynamodb airnode-a03b926-dev-terraform-lock
-            // eventbridge airnode-a03b926-dev-startCoordinator-schedule-rule
-            /* lambda
-
- Function name
- Description
- Package type
- Runtime
- Code size
- Last modified
-
- airnode-a03b926-dev-startCoordinator	-	Zip	Node.js 14.x	1.4 MB	1 minute ago
-
- airnode-a03b926-dev-initializeProvider	-	Zip	Node.js 14.x	1.4 MB	2 minutes ago
-
- airnode-a03b926-dev-callApi	-	Zip	Node.js 14.x	1.4 MB	2 minutes ago
-
- airnode-a03b926-dev-processProviderRequests
-           */
-            /*
-          IAM
-Role name
-Trusted entities
-Last activity
-
-airnode-a03b926-dev-callApi-role
-AWS Service: lambda
--
-
-airnode-a03b926-dev-initializeProvider-role
-AWS Service: lambda
--
-
-airnode-a03b926-dev-processProviderRequests-role
-AWS Service: lambda
--
-
-airnode-a03b926-dev-startCoordinator-role
-           */
-          }
-        });
-      })
-      .catch((e) => {
-        console.trace('Unable to delete buckets, will retry: ', e);
-        if (triesRemaining && triesRemaining > -1) {
-          const newTriesRemaining = triesRemaining ? triesRemaining-- : 5;
-          deleteBuckets(newTriesRemaining).catch();
-        }
-      });
-  };
-  promises.push(deleteBuckets());
-
-  return Promise.all(promises);
 };

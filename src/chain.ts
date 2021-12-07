@@ -2,9 +2,9 @@ import { join } from 'path';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs';
 import { ethers } from 'ethers';
 import { encode } from '@api3/airnode-abi';
+import { NonceManager } from '@ethersproject/experimental';
 import { IntegrationInfo } from './types';
 import { removeExtension } from './utils';
-import {NonceManager} from "@ethersproject/experimental";
 
 export const deploymentPath = join(__dirname, '../docker-poa-network.json');
 
@@ -49,8 +49,7 @@ export const getArtifact = (artifactsFolderPath: string) => {
  * @returns encodedParams airnode-abi encoded parameters
  * @param coin
  */
-export const getEncodedParameters = (coin: string) =>
-    encode([{ name: 'coinId', type: 'bytes32', value: coin }]);
+export const getEncodedParameters = (coin: string) => encode([{ name: 'coinId', type: 'bytes32', value: coin }]);
 
 /**
  * Deploys the contract specified by the path to the artifact and constructor arguments. This method will also write the
@@ -76,7 +75,7 @@ export const deployContract = async (
   const contractFactory = new ethers.ContractFactory(
     artifact.abi,
     artifact.bytecode,
-    wallet? wallet : await getUserWallet(integrationInfo)
+    wallet ? wallet : await getUserWallet(integrationInfo)
   );
   const contract = await contractFactory.deploy(...args);
   await contract.deployed();

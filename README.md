@@ -12,6 +12,7 @@ This document should be read in the context of the report available on Confluenc
 ## Components
 
 Begin by installing the app's dependencies:
+
 ```shell
 yarn install
 ```
@@ -56,9 +57,10 @@ You'll have to build these images, eg: `docker-compose build` You may also wish 
 `docker-compose push/pull`
 
 ## Additional Dependencies
+
 Unfortunately, Google's Cloud Function Logging documentation (which is a sepaerate subsystem to GCP's main logging
-system - although some Cloud Function events are logged in this system) is poorly documented. This application has
-taken to using the `gcloud` tool to retrieve logs - it was the best trade-off.
+system - although some Cloud Function events are logged in this system) is poorly documented. This application has taken
+to using the `gcloud` tool to retrieve logs - it was the best trade-off.
 
 You'll therefore need the `gcloud` utility installed as well as authenticated as this application will use your home
 folder-based GCP credentials to do a lot of its work.
@@ -137,13 +139,13 @@ For illustration (this is invalid JSON due to comments), the file takes this for
                                                            # InfuraProviderURL and MasterWalletOverrideMnemonic.
   "MasterWalletOverrideMnemonic": "long long mnemonic",
   "InfuraProviderURL": "https://ropsten.infura.io/v3/2452a362d68147c2b3d84a1b4e3bb448",
-  
+
                                                            # InfuraProviderAirnodeOverrideURL provides an override
                                                            # parameter that is only used with the Airnode Deployer.
                                                            # This is useful if you''d like to make use of Infura's
                                                            # RPC graphs (especially to see what methods are used the
                                                            # most by Airnode).
-                                                           
+
                                                            # This parameter is optional.
   "InfuraProviderAirnodeOverrideURL": "https://ropsten.infura.io/v3/18d2f6eedb334abb8389f67a652790ec"
 
@@ -207,11 +209,11 @@ to generate graphs.
 #### Memory Usage:
 
 ```sql
-        select 
+        select
         CONCAT('Runs: ', request_count::text, ' | Test ID:', substring(test_key from 33)) as "Requests Issued",
         (metrics->3->'memory_usage')::integer  as "startCoordinator Duration",
         (metrics->1->'memory_usage')::integer  as "initializeProvider Duration",
-        (metrics->0->'memory_usage')::integer  as "callAPI Duration", 
+        (metrics->0->'memory_usage')::integer  as "callAPI Duration",
         (metrics->2->'memory_usage')::integer  as "processProviderRequests Duration"
         from metrics
         WHERE success = true AND $__timeFilter(run_end)

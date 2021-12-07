@@ -54,8 +54,8 @@ export interface LogRecord {
  * Cloud Provider configuration - a near-copy of Airnode's config.json type.
  */
 export interface CloudProvider {
-  name: 'aws' | 'gcp';
-  projectId: string;
+  type: 'aws' | 'gcp';
+  projectId?: string;
   region: string;
 }
 
@@ -78,6 +78,8 @@ export interface StressTestConfig {
   CloudProvider: CloudProvider;
   MaxBatchSize?: number;
   ChainId?: string;
+  NodeVersion?: string;
+  IgnoreNodeVersion?: boolean;
 }
 
 /**

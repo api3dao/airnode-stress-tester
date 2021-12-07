@@ -2,6 +2,11 @@ import { Pool } from 'pg';
 import { OutputMetrics, PostgresConfig, StressTestConfig } from './types';
 import { cliPrint } from './cli';
 
+/**
+ * Initialises the database using the supplied configuration object
+ *
+ * @param pgConfig
+ */
 export const initDB = (pgConfig: PostgresConfig) => {
   const pgPool = new Pool({
     user: pgConfig.PostgresUser,
@@ -41,6 +46,15 @@ export const initDB = (pgConfig: PostgresConfig) => {
   return pgPool;
 };
 
+/**
+ * Writes test telemetry to the database.
+ *
+ * @param pg A Postgres connection pool object
+ * @param metrics The metrics to write
+ * @param testKey The test's unique UUID identifier
+ * @param TestType What kind of test was run (provider specific)
+ * @param Comment A commend for the test
+ */
 export const sendToDB = async (
   pg: Pool | null,
   metrics: OutputMetrics,
@@ -67,7 +81,7 @@ export const sendToDB = async (
         metrics.success,
         metrics.walletCount,
         metrics.chainCount,
-        Comment
+        Comment,
       ]
     )
       .catch((e) => {
