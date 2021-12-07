@@ -290,7 +290,8 @@ const main = async () => {
         `-e USER_ID=$(id -u) -e GROUP_ID=$(id -g)`,
         `-v ${join(__dirname, '../')}:/app/config`,
         `-v ${join(__dirname, '..')}:/app/output`,
-        `api3/airnode-deployer:latest deploy` + IgnoreNodeVersion ? '  --skip-version-check ' : '',
+        `api3/airnode-deployer:latest deploy`,
+        IgnoreNodeVersion ? '--skip-version-check' : ''
       ].join(' ');
       cliPrint.info(deployCommand);
 

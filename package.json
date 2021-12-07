@@ -18,7 +18,8 @@
     "lint:eslint:fix": "eslint . --ext .js,.ts --fix",
     "lint:solhint": "solhint ./**/*.sol",
     "prettier:check": "prettier --check \"./**/*.{js,sol,ts,md,yml,json}\"",
-    "prettier:write": "prettier --write \"./**/*.{js,sol,ts,md,yml,json}\" --loglevel silent"
+    "prettier:write": "prettier --write \"./**/*.{js,sol,ts,md,yml,json}\" --loglevel silent",
+    "precommit": "lint"
   },
   "devDependencies": {
     "@api3/airnode-abi": "^0.2.2",
@@ -45,9 +46,15 @@
     "@types/node": "^16.11.6",
     "@types/pg": "^8.6.1",
     "@types/prompts": "^2.0.14",
+    "@typescript-eslint/eslint-plugin": "^5.6.0",
+    "@typescript-eslint/parser": "^5.6.0",
     "bottleneck": "^2.19.5",
     "chalk": "^4.1.2",
     "dotenv": "^10.0.0",
+    "eslint": "^8.4.1",
+    "eslint-plugin-functional": "^4.0.2",
+    "eslint-plugin-import": "^2.25.3",
+    "eslint-plugin-jest": "^25.3.0",
     "ethereum-waffle": "^3.4.0",
     "ethers": "^5.4.4",
     "googleapis": "^91.0.0",
@@ -56,19 +63,14 @@
     "lodash": "^4.17.21",
     "pg": "^8.7.1",
     "prettier": "^2.5.1",
+    "prettier-plugin-solidity": "^1.0.0-beta.19",
     "prompts": "^2.4.1",
     "sqlite": "^4.0.23",
     "ts-jest": "^27.0.5",
     "ts-node": "^10.2.1",
-    "typescript": "^4.3.5",
-    "@typescript-eslint/eslint-plugin": "^5.6.0",
-    "@typescript-eslint/parser": "^5.6.0",
-    "eslint": "^8.4.1",
-    "eslint-plugin-functional": "^4.0.2",
-    "eslint-plugin-import": "^2.25.3",
-    "eslint-plugin-jest": "^25.3.0",
-    "pre-commit": "^1.2.2",
-    "prettier-plugin-solidity": "^1.0.0-beta.19"
+    "typescript": "^4.3.5"
   },
-  "dependencies": {}
+  "dependencies": {
+    "solhint": "^3.3.6"
+  }
 }
