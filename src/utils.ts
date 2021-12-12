@@ -1,4 +1,4 @@
-import path, { join } from 'path';
+import { join } from 'path';
 import * as os from 'os';
 import { readFileSync, writeFileSync } from 'fs';
 import { spawn } from 'child_process';
@@ -14,7 +14,7 @@ export const getGcpCredentials = () => {
   const stressTestConfig = getStressTestConfig();
   if (stressTestConfig.CloudProvider.type === 'gcp') {
     return [
-      ` -v ${path.join(
+      ` -v ${join(
         os.homedir(),
         '/.config/gcloud/application_default_credentials.json:/application_default_credentials.json'
       )} `,

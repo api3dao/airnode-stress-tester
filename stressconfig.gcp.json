@@ -30,7 +30,7 @@
   "TestType": "HardHatProvider",
   "Comment": "GCP First",
   "CloudProvider": {
-    "name": "gcp",
+    "type": "gcp",
     "region": "us-east4",
     "projectId": "api3-333217"
   }

@@ -291,7 +291,7 @@ const main = async () => {
         `-v ${join(__dirname, '../')}:/app/config`,
         `-v ${join(__dirname, '..')}:/app/output`,
         `api3/airnode-deployer:latest deploy`,
-        IgnoreNodeVersion ? '--skip-version-check' : ''
+        IgnoreNodeVersion ? '--skip-version-check' : '',
       ].join(' ');
       cliPrint.info(deployCommand);
 

@@ -1,4 +1,4 @@
-import fs, { readFileSync, writeFileSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { JsonOutputConfig } from './types';
 
 /**
@@ -21,7 +21,7 @@ export const appendMetrics = (
     return;
   }
 
-  if (!fs.existsSync(FilePath)) {
+  if (!existsSync(FilePath)) {
     writeFileSync(FilePath, JSON.stringify([]));
   }
 
