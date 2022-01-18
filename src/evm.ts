@@ -12,7 +12,7 @@ export const deriveWalletPathFromSponsorAddress = (sponsorAddress: string): stri
     const shiftedSponsorAddressBN = sponsorAddressBN.shr(31 * i);
     paths.push(shiftedSponsorAddressBN.mask(31).toString());
   }
-  return `0/${paths.join('/')}`;
+  return `1/${paths.join('/')}`;
 };
 
 export const verifyAirnodeXpub = (airnodeXpub: string, airnodeAddress: string): ethers.utils.HDNode => {
