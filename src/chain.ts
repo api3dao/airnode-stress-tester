@@ -7,15 +7,21 @@ import { formatEther, parseEther } from 'ethers/lib/utils';
 import Bottleneck from 'bottleneck';
 import { range } from 'lodash';
 import { AirnodeRrp } from '@api3/airnode-protocol';
-import { ContractsAndRequestsProps, IntegrationInfo } from './types';
+import { deriveAirnodeXpub, deriveSponsorWalletAddress } from '@api3/airnode-admin';
+import { ContractsAndRequestsProps, IntegrationInfo, TestType } from './types';
 import { getIntegrationInfo, getMaxBatchSize, removeExtension } from './utils';
 import { cliPrint } from './cli';
 import { generateConfigJson } from './config-utils';
-import { deriveAirnodeXpub, deriveSponsorWalletAddress } from './implementation';
 
 export const deploymentPath = join(__dirname, '../docker-poa-network.json');
 
-export const doHardHatMine = async (provider: ethers.providers.JsonRpcProvider, testType: string) => {
+/**
+ * A convenience function that calls a special RPC function to make HardHat mine a block.
+ *
+ * @param provider an EVM provider
+ * @param testType testType is a TestType
+ */
+export const doHardHatMine = async (provider: ethers.providers.JsonRpcProvider, testType: TestType) => {
   if (testType === 'HardHatProvider') {
     await provider.send('evm_mine', []).catch((e) => {
       console.trace('Mine block failed', e);
@@ -23,6 +29,17 @@ export const doHardHatMine = async (provider: ethers.providers.JsonRpcProvider, 
   }
 };
 
+/**
+ * RetryingProvider retries every call that goes through it.
+ *
+ * The stress tester has to set up chain services that often require several hundred EVM calls. To speed up these calls
+ * they are done in parallel, but this places a lot of strain on the EVM node and the network. Sometimes (~1%) of calls
+ * fail and this can be very problematic. To avoid having complex fault-handling logic further up the stack, this class
+ * retries every request on failure, up to a maximum of 5 attempts.
+ *
+ * This has the effect of making chain set up very reliable, even when doing batches of 100 calls concurrently and that
+ * means chain set up is now _very_ fast.
+ */
 export class RetryingProvider extends ethers.providers.JsonRpcProvider {
   constructor(url: string) {
     super(url);
@@ -248,6 +265,17 @@ export const deployContract = async (
 export const readChainId = async (integrationInfo: IntegrationInfo) =>
   (await getProvider(integrationInfo).getNetwork()).chainId;
 
+/**
+ * Checks an EVM address to determine if it has less than `lowThreshold` funds and if it does, it uses the `sourceWallet`
+ * to send funds to the `destinationAddress`. It is useful for on-chain tests where re-producible wallets are used so
+ * that less testnet tokens are required.
+ *
+ * @param provider an EVM provider
+ * @param sourceWallet the source wallet from which to send funds
+ * @param destinationAddress the destination address
+ * @param lowThreshold if the `destinationAddress` has less funds than this `amountToSend` will be sent
+ * @param amountToSend the amount to send to the `destinationAddress`
+ */
 export const fundAWallet = async (
   provider: ethers.providers.JsonRpcProvider,
   sourceWallet: Wallet | NonceManager,

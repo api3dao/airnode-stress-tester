@@ -17,7 +17,7 @@
     }
   ],
   "runRepeats": 10,
-  "ssonOutputConfig": {
+  "jsonOutputConfig": {
     "enabled": true,
     "filePath": "metrics.json"
   },

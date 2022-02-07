@@ -14,7 +14,7 @@ export interface RunDependencies {
  * Postgres Database config type
  */
 export interface PostgresConfig {
-  readonly PostgresEnabled: boolean;
+  readonly enabled: boolean;
   readonly user: string;
   readonly password: string;
   readonly host: string;
@@ -68,6 +68,8 @@ export interface CloudProvider {
   readonly region: string;
 }
 
+export type TestType = 'MockedProvider' | 'HardHatProvider' | 'OpenEthereumProvider' | 'RopstenProvider';
+
 /**
  * Stress Test Config type
  */
@@ -79,7 +81,7 @@ export interface StressTestConfig {
   readonly jsonOutputConfig: JsonOutputConfig;
   readonly sshConfig: SshConfig;
   readonly randomLength: number;
-  readonly testType: 'MockedProvider' | 'HardHatProvider' | 'OpenEthereumProvider' | 'RopstenProvider';
+  readonly testType: TestType;
   readonly infuraProviderUrl?: string;
   readonly masterWalletOverrideMnemonic?: string;
   readonly infuraProviderAirnodeOverrideURL?: string;

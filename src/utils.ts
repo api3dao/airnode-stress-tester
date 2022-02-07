@@ -11,7 +11,10 @@ import { getAirnodeWalletMnemonic } from './chain';
 import { DEFAULT_CHAIN_ID } from './constants';
 import { initDB } from './database';
 
-export const checkSshSanity = ({ sshConfig }: StressTestConfig) => {
+export const checkSshSanity = ({ sshConfig, testType }: StressTestConfig) => {
+  if (testType === 'RopstenProvider') {
+    return;
+  }
   const { sshKeyPath, sshRemoteHost, sshUser, sshPort } = sshConfig;
 
   if (contains(sshRemoteHost, 'local') && !(sshRemoteHost && sshUser && sshPort && sshKeyPath)) {
@@ -122,7 +125,7 @@ export const getMaxBatchSize = (stressTestConfig: StressTestConfig) => {
 };
 
 export const getPostgresDatabase = ({ postgresConfig }: StressTestConfig) => {
-  if (postgresConfig && postgresConfig.PostgresEnabled) {
+  if (postgresConfig && postgresConfig.enabled) {
     return initDB(postgresConfig);
   }
 
@@ -314,7 +317,7 @@ export const removeAirnode = async () => {
     gcpCredsEnv,
     gcpCredsMount,
     `-v ${join(__dirname, '../')}:/app/output`,
-    `api3/airnode-deployer:latest remove -r output/receipt.json --debug`,
+    `aquarat/airnode-deployer:latest remove -r output/receipt.json --debug`,
   ].join(' ');
   cliPrint.info(deployCommand);
 

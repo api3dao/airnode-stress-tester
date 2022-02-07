@@ -36,7 +36,7 @@ const templateConfigJson = {
       enabled: false,
     },
     logFormat: 'plain',
-    logLevel: 'WARN',
+    logLevel: 'ERROR',
     nodeVersion: '0.2.2',
     stage: 'dev',
   },
@@ -200,7 +200,6 @@ export const generateConfigJson = (chainRrps: string[]) => {
           unit: 'gwei',
         },
       },
-      authorizers: [],
       contracts: {
         AirnodeRrp: rrp,
       },

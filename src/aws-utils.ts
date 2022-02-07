@@ -44,8 +44,8 @@ export const getMetrics = async () => {
       )
     )
       .map((ls) => ls.logStreams)
-      .filter((ls) => ls && ls!.length > 0)
-      ?.flatMap((ls) =>
+      .filter((ls) => ls && ls.length > 0)
+      .flatMap((ls) =>
         ls!.map((lss) => {
           const logGroupName = getLogGroupName(lss!.arn!);
 
@@ -64,7 +64,7 @@ export const getMetrics = async () => {
           })
         );
 
-        return { ...ls, logData: logData.events }; // there's a nextBackwardToken and nextForwardToken which may be needed
+        return { ...ls, logData: logData.events };
       })
   );
 

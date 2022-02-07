@@ -16,6 +16,7 @@ import { getGreatestStats } from './metrics-utils';
  * @param a The stdout output from the gcloud command
  */
 const trimGCloudOutput = (a: string) => a.substring(1, a.length - 2);
+
 /**
  * Retrieves logs from Google Cloud
  */
