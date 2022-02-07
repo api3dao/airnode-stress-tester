@@ -1,0 +1,52 @@
+{
+  "testRuns": [
+    {
+      "requestCount": 1,
+      "walletCount": 1,
+      "chainCount": 1
+    },
+    {
+      "requestCount": 1,
+      "walletCount": 10,
+      "chainCount": 1
+    },
+    {
+      "requestCount": 1,
+      "walletCount": 250,
+      "chainCount": 1
+    }
+  ],
+  "runRepeats": 10,
+  "ssonOutputConfig": {
+    "enabled": true,
+    "filePath": "metrics.json"
+  },
+  "sshConfig": {
+    "sshKeyPath": "/home/user/key.pem",
+    "sshRemoteHost": "10.0.0.2",
+    "sshUser": "sshuser",
+    "sshPort": 22,
+    "yamlPath": "/main/Projects/stress-test-server/stress-services.yml"
+  },
+  "postgresConfig": {
+    "postgresEnabled": true,
+    "user": "stress_tester",
+    "password": "hello",
+    "host": "10.0.0.2",
+    "port": 5432,
+    "database": "stress_tester"
+  },
+  "randomLength": 5,
+  "testType": "RopstenProvider",
+  "comment": "GCP Ropsten",
+  "cloudProvider": {
+    "type": "gcp",
+    "region": "us-east4",
+    "projectId": "api3-351217"
+  },
+  "nodeVersion": "0.4.0",
+  "maxBatchSize": 100,
+  "infuraProviderURL": "https://eth-ropsten.alchemyapi.io/v2/something",
+  "masterWalletOverrideMnemonic": "test test test ... junk",
+  "chainId": "3"
+}

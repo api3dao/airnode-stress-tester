@@ -7,7 +7,7 @@ import {
 } from '@aws-sdk/client-cloudwatch-logs';
 import { LogStream } from './types';
 import { contains } from './utils';
-import { getGreatestStats, compareDescendingOutputLogEvent } from './metrics_utils';
+import { getGreatestStats, compareDescendingOutputLogEvent } from './metrics-utils';
 
 /**
  * Gets the LogGroupName from the arn.

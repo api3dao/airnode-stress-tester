@@ -79,48 +79,48 @@ For illustration (this is invalid JSON due to comments), the file takes this for
 
 ```json
 {
-  "TestRuns": [                                             # An array of test run config options
+  "testRuns": [                                             # An array of test run config options
       {
-      "RequestCount": 1,                                    # The number of requests per Requester
-      "WalletCount": 10,                                    # The number of Requester+Sponsor combinations deployed
-      "ChainCount": 9                                       # The number of chains
+      "requestCount": 1,                                    # The number of requests per Requester
+      "walletCount": 10,                                    # The number of Requester+Sponsor combinations deployed
+      "chainCount": 9                                       # The number of chains
     },                                                      #
     {                                                       # The above takes the form of, per run:
-      "RequestCount": 2,                                    #
-      "WalletCount": 10,                                    # RequestCount * WalletCount * ChainCount = Total Requests
-      "ChainCount": 9
+      "requestCount": 2,                                    #
+      "walletCount": 10,                                    # RequestCount * WalletCount * ChainCount = Total Requests
+      "chainCount": 9
     },
     ...
   ],
-  "JSONOutputConfig": {
-    "Enabled": true,                                        # Should metrics be logged to a JSON file?
-    "FilePath": "metrics.json"                              # The file path
+  "jsonOutputConfig": {
+    "enabled": true,                                        # Should metrics be logged to a JSON file?
+    "filePath": "metrics.json"                              # The file path
   },                                                        # I''ve found an app called fx to be great for viewing JSON.
-  "SsHConfig": {
-  "SshKeyPath": "/home/someuser/Downloads/211101API3.pem",  # Either a path to an SSH key or "local".
+  "ssHConfig": {
+  "sshKeyPath": "/home/someuser/Downloads/211101API3.pem",  # Either a path to an SSH key or "local".
                                                             # If 'local', swarm services will be directly manipulated
                                                             # otherwise the tester will log into the remote machine
                                                             # to manipulate swarm services (via SSH).
-  "SshRemoteHost": "12.234.201.206",                        # unused if local
-  "SshPort": 22,                                            # unused if local
-  "SshUser": "ubuntu",                                      # unused if local
-  "YamlPath": "/home/ubuntu/swarm/services.yml"             # path to the services YAML file on the target system
+  "sshRemoteHost": "12.234.201.206",                        # unused if local
+  "sshPort": 22,                                            # unused if local
+  "sshUser": "ubuntu",                                      # unused if local
+  "yamlPath": "/home/ubuntu/swarm/services.yml"             # path to the services YAML file on the target system
   },
-  "PostgresConfig": {                                       # Postgres''s config
-    "PostgresEnabled": true,
-    "PostgresUser": "airnode",
-    "PostgresPassword": "airnode",
-    "PostgresHost": "127.0.0.1",
-    "PostgresPort": 5432,
-    "PostgresDatabase": "airnode"
+  "postgresConfig": {                                       # Postgres''s config
+    "postgresEnabled": true,
+    "user": "airnode",
+    "password": "airnode",
+    "host": "127.0.0.1",
+    "port": 5432,
+    "database": "airnode"
   },
-  "MaxBatchSize": 10,                                      # Too-big-a-batch of transactions can overload HardHat
+  "maxBatchSize": 10,                                      # Too-big-a-batch of transactions can overload HardHat
                                                            # 10 seems to be a good number for a t3a.medium EC2 machine
-  "RandomLength": 5,                                       # The stress tester generates strings of this length as part
+  "randomLength": 5,                                       # The stress tester generates strings of this length as part
                                                            # of the API requests generated. This only applies to actual
                                                            # EVM implementations (HardHat and OpenEthereum).
 
-  "TestType": "HardHatProvider",                           # HardHatProvider is the preferred provider.
+  "testType": "HardHatProvider",                           # HardHatProvider is the preferred provider.
 
                                                            # "MockedProvider" - serves static RPC responses, very fast.
                                                            # Only supports 1-100 requests, no multi-chain and no
@@ -137,8 +137,8 @@ For illustration (this is invalid JSON due to comments), the file takes this for
                                                            # node, but requires both a provider URL and a funded wallet
                                                            # mnemonic. These parameters are configured as
                                                            # InfuraProviderURL and MasterWalletOverrideMnemonic.
-  "MasterWalletOverrideMnemonic": "long long mnemonic",
-  "InfuraProviderURL": "https://ropsten.infura.io/v3/2452a362d68147c2b3d84a1b4e3bb448",
+  "masterWalletOverrideMnemonic": "long long mnemonic",
+  "infuraProviderURL": "https://ropsten.infura.io/v3/2452a362d68147c2b3d84a1b4e3bb448",
 
                                                            # InfuraProviderAirnodeOverrideURL provides an override
                                                            # parameter that is only used with the Airnode Deployer.
@@ -147,14 +147,13 @@ For illustration (this is invalid JSON due to comments), the file takes this for
                                                            # most by Airnode).
 
                                                            # This parameter is optional.
-  "InfuraProviderAirnodeOverrideURL": "https://ropsten.infura.io/v3/18d2f6eedb334abb8389f67a652790ec"
+  "infuraProviderAirnodeOverrideURL": "https://ropsten.infura.io/v3/18d2f6eedb334abb8389f67a652790ec"
 
-  "MaxBatchSize": 5                                        # This limits the number of _concurrent_ EVM RPC calls
+  "maxBatchSize": 5                                        # This limits the number of _concurrent_ EVM RPC calls
                                                            # at a high level (ethers may do more calls underneath).
                                                            # HardHat becomes unreliable around 10 concurrent requests.
-  "ChainId": "3"                                           # The Chain ID can be optionally specified
-  "NodeVersion": "v0.2.2"                                  # Optional
-  "IgnoreNodeVersion": true                                # Optional, adds --skip-version-check to deploy command
+  "chainId": "3"                                           # The Chain ID can be optionally specified
+  "nodeVersion": "v0.2.2"                                  # Optional
 }
 ```
 

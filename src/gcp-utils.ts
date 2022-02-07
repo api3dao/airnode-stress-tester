@@ -1,9 +1,9 @@
 import { spawnSync } from 'child_process';
 import { groupBy } from 'lodash';
-import { contains } from './utils';
+import { contains, getStressTestConfig } from './utils';
 import { LogRecord } from './types';
 import { cliPrint } from './cli';
-import { getGreatestStats } from './metrics_utils';
+import { getGreatestStats } from './metrics-utils';
 
 // By default, the client will authenticate using the service account file
 // specified by the GOOGLE_APPLICATION_CREDENTIALS environment variable and use
@@ -15,21 +15,18 @@ import { getGreatestStats } from './metrics_utils';
  *
  * @param a The stdout output from the gcloud command
  */
-const trimGCloudOutput = (a: string) => {
-  return a.substring(1, a.length - 2);
-};
-
+const trimGCloudOutput = (a: string) => a.substring(1, a.length - 2);
 /**
  * Retrieves logs from Google Cloud
  */
-export const getGCPMetrics = async (): Promise<LogRecord[]> => {
-  /*
-        I tried using GCP's SDK... it's a nightmare; poorly documented and difficult to work with.
-        I eventually settled on calling the gcloud cli app.
-       */
+export const getGCPMetrics = async (stage: string): Promise<LogRecord[]> => {
+  const { cloudProvider } = getStressTestConfig();
+  const gFunctionsOutput = spawnSync(`bash`, [
+    `-c`,
+    `gcloud beta functions list --project=${cloudProvider.projectId} --regions=${cloudProvider.region} --format=json`,
+  ]).output.toString();
 
-  const gFunctionsOutput = spawnSync(`bash`, [`-c`, `gcloud beta functions list --format=json`]).output.toString();
-
+  // TODO region is now required, bring in from config
   const gFunctionsList = JSON.parse(trimGCloudOutput(gFunctionsOutput))
     .filter((gf: { entryPoint: string; name: string }) => {
       switch (gf.entryPoint) {
@@ -42,6 +39,7 @@ export const getGCPMetrics = async (): Promise<LogRecord[]> => {
           return false;
       }
     })
+    .filter((gf: { entryPoint: string; name: string }) => gf.name.indexOf(stage) > -1)
     .map((gf: { name: string }) => gf.name)
     .map((gf: string) => {
       const splitGf = gf.split('/');
@@ -52,9 +50,7 @@ export const getGCPMetrics = async (): Promise<LogRecord[]> => {
       // Logs are not deleted when cloud functions are removed, so log retrieval must be constrained
       const gcloudProc = spawnSync(`bash`, [
         `-c`,
-        `gcloud beta functions logs read "${gf}" --filter "time_utc > \"${new Date(
-          Date.now() - (2 + 120) * 60 * 1000
-        ).toISOString()}\"" --region us-east4 --limit=1000 --format=json`,
+        `gcloud beta functions logs read "${gf}" --region=${cloudProvider.region} --project=${cloudProvider.projectId} --limit=1000 --format=json`,
       ]).output.toString();
 
       return JSON.parse(trimGCloudOutput(gcloudProc));

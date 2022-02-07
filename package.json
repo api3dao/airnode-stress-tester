@@ -12,20 +12,21 @@
   },
   "description": "A stress tester for Airnode",
   "scripts": {
-    "do-test-run": "ts-node src/do_test_run.ts",
+    "do-test-run": "ts-node src/do-test-run.ts",
     "lint": "yarn run lint:eslint && yarn run lint:solhint && yarn prettier:check",
     "lint:eslint": "eslint . --ext .js,.ts",
     "lint:eslint:fix": "eslint . --ext .js,.ts --fix",
     "lint:solhint": "solhint ./**/*.sol",
     "prettier:check": "prettier --check \"./**/*.{js,sol,ts,md,yml,json}\"",
     "prettier:write": "prettier --write \"./**/*.{js,sol,ts,md,yml,json}\" --loglevel silent",
-    "precommit": "lint"
+    "precommit": "lint",
+    "prepare": "husky install"
   },
   "devDependencies": {
-    "@api3/airnode-abi": "^0.2.2",
-    "@api3/airnode-admin": "^0.2.2",
-    "@api3/airnode-deployer": "^0.2.2",
-    "@api3/airnode-protocol": "^0.2.2",
+    "@api3/airnode-abi": "^0.3.1",
+    "@api3/airnode-admin": "^0.3.1",
+    "@api3/airnode-deployer": "^0.3.1",
+    "@api3/airnode-protocol": "^0.3.1",
     "@aws-sdk/client-api-gateway": "^3.41.0",
     "@aws-sdk/client-apigatewaymanagementapi": "^3.41.0",
     "@aws-sdk/client-cloudwatch": "^3.39.0",
@@ -43,6 +44,7 @@
     "@openzeppelin/contracts": "^4.3.3",
     "@types/jest": "^27.0.2",
     "@types/lodash": "^4.14.177",
+    "@types/mocha": "^9.0.0",
     "@types/node": "^16.11.6",
     "@types/pg": "^8.6.1",
     "@types/prompts": "^2.0.14",
@@ -59,6 +61,8 @@
     "ethers": "^5.4.4",
     "googleapis": "^91.0.0",
     "hardhat": "^2.7.0",
+    "husky": "^7.0.4",
+    "jest": "^27.4.4",
     "lodash": "^4.17.21",
     "pg": "^8.7.1",
     "prettier": "^2.5.1",
@@ -68,10 +72,7 @@
     "sqlite": "^4.0.23",
     "ts-jest": "^27.0.5",
     "ts-node": "^10.2.1",
-    "typescript": "^4.3.5",
-    "@types/mocha": "^9.0.0",
-    "husky": "^7.0.4",
-    "jest": "^27.4.4"
+    "typescript": "^4.3.5"
   },
   "dependencies": {}
 }

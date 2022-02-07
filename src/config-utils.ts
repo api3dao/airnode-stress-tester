@@ -1,11 +1,19 @@
 import { deepCopy } from 'ethers/lib/utils';
-import { ContractsAndRequestsConfig } from './types';
-import { getStressTestConfig } from './utils';
+import { generateRandomString, getStressTestConfig } from './utils';
 import { DEFAULT_CHAIN_ID } from './constants';
 
 const templateConfigJson = {
   chains: [
     {
+      options: {
+        txType: 'eip1559',
+        baseFeeMultiplier: '6',
+        priorityFee: {
+          value: '9.12',
+          unit: 'gwei',
+        },
+      },
+      maxConcurrency: 1000,
       authorizers: [],
       contracts: {
         AirnodeRrp: '${AIRNODE_RRP_ADDRESS}',
@@ -28,7 +36,7 @@ const templateConfigJson = {
       enabled: false,
     },
     logFormat: 'plain',
-    logLevel: 'DEBUG',
+    logLevel: 'WARN',
     nodeVersion: '0.2.2',
     stage: 'dev',
   },
@@ -49,17 +57,13 @@ const templateConfigJson = {
       apiSpecifications: {
         servers: [
           {
-            url: 'https://mock-api.api3mock.link',
+            url: 'https://i9zjclss79.execute-api.us-east-1.amazonaws.com/default',
           },
         ],
         paths: {
-          '/coins/{id}': {
+          '/stress-tester-mock-coingecko-api': {
             get: {
               parameters: [
-                {
-                  in: 'path',
-                  name: 'id',
-                },
                 {
                   in: 'query',
                   name: 'localization',
@@ -98,7 +102,7 @@ const templateConfigJson = {
           name: 'coinMarketData',
           operation: {
             method: 'get',
-            path: '/coins/{id}',
+            path: '/stress-tester-mock-coingecko-api',
           },
           fixedOperationParameters: [
             {
@@ -158,16 +162,7 @@ const templateConfigJson = {
               fixed: '1000000',
             },
           ],
-          parameters: [
-            {
-              name: 'coinId',
-              operationParameter: {
-                in: 'path',
-                name: 'id',
-              },
-            },
-          ],
-          testable: true,
+          parameters: [],
         },
       ],
     },
@@ -180,25 +175,36 @@ const templateConfigJson = {
  *
  * @param chainRrps An array of strings representing AirnodeRrps
  */
-export const generateConfigJson = (chainRrps: ContractsAndRequestsConfig[]) => {
-  const { CloudProvider, ChainId, NodeVersion } = getStressTestConfig();
+export const generateConfigJson = (chainRrps: string[]) => {
+  const stageIdentifier = generateRandomString(6);
+  const { cloudProvider, chainId, nodeVersion } = getStressTestConfig();
   const configSource = deepCopy(templateConfigJson);
   const config = {
     ...configSource,
     nodeSettings: {
       ...configSource.nodeSettings,
-      cloudProvider: CloudProvider,
-      nodeVersion: NodeVersion ? NodeVersion : 'v0.0.1',
+      cloudProvider: cloudProvider,
+      nodeVersion: nodeVersion ? nodeVersion : 'v0.0.1',
+      stage: stageIdentifier,
     },
   };
 
   const chains = chainRrps.map((rrp, idx) => {
     return {
+      maxConcurrency: 1000,
+      options: {
+        txType: 'eip1559',
+        baseFeeMultiplier: '2',
+        priorityFee: {
+          value: '3.12',
+          unit: 'gwei',
+        },
+      },
       authorizers: [],
       contracts: {
-        AirnodeRrp: rrp.AirnodeRrpAddress,
+        AirnodeRrp: rrp,
       },
-      id: (ChainId ? ChainId : DEFAULT_CHAIN_ID).toString(10),
+      id: (chainId ? chainId : DEFAULT_CHAIN_ID).toString(10),
       providers: {
         [`provider chain ${idx}`]: {
           url: '${PROVIDER_URL}',
