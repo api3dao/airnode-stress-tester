@@ -36,7 +36,7 @@ export const getMetrics = async () => {
     return;
   }
 
-  const groups = logGroups.filter((group) => group!.logGroupName!.indexOf('airnode-') > -1);
+  const groups = logGroups.filter((group) => group!.logGroupName!.includes('airnode-'));
   const logStreams = await Promise.all(
     (
       await Promise.all(
