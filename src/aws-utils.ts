@@ -44,7 +44,7 @@ export const getMetrics = async () => {
       )
     )
       .map((ls) => ls.logStreams)
-      .filter((ls) => ls && ls!.length > 0)
+      .filter((ls) => ls && ls.length > 0)
       ?.flatMap((ls) =>
         ls!.map((lss) => {
           const logGroupName = getLogGroupName(lss!.arn!);
