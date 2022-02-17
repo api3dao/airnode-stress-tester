@@ -14,10 +14,7 @@ import { getGreatestStats, compareDescendingOutputLogEvent } from './metrics-uti
  *
  * Example arn: 'arn:aws:logs:us-east-1:832815310268:log-group:/aws/lambda/airnode-194b72f-dev-initializeProvider:log-stream:2021/11/03/[$LATEST]0df015c1c2a24875bb7cad5425362c4d'
  */
-export const getLogGroupName = (arn: string) => {
-  const tokens = arn.split(':');
-  return tokens[6];
-};
+export const getLogGroupName = (arn: string) => arn.split(':')[6];
 
 /**
  * Connects to CloudWatch, grabs all recent logs matching Airnode handlers, merges them together into a set of
@@ -32,9 +29,7 @@ export const getMetrics = async () => {
   const command = new DescribeLogGroupsCommand({});
   const logGroups = (await client.send(command)).logGroups;
 
-  if (!logGroups?.filter) {
-    return;
-  }
+  if (!logGroups?.filter) return;
 
   const groups = logGroups.filter((group) => group!.logGroupName!.includes('airnode-'));
   const logStreams = await Promise.all(
@@ -70,9 +65,7 @@ export const getMetrics = async () => {
 
   const logs: { [key: string]: OutputLogEvent[] } = {};
   logStreams.forEach((ls: LogStream) => {
-    if (!ls.logGroupName || !ls.logData) {
-      return;
-    }
+    if (!ls.logGroupName || !ls.logData) return;
 
     if (!logs[ls.logGroupName]) {
       logs[ls.logGroupName] = new Array<OutputLogEvent>();
@@ -82,27 +75,21 @@ export const getMetrics = async () => {
   });
 
   for (const [key, value] of Object.entries(logs)) {
-    // @ts-ignore
     logs[key] = value.sort(compareDescendingOutputLogEvent); // ORDER BY DESC
   }
 
   const metrics = [];
   for (const [key, value] of Object.entries(logs)) {
-    if (!value) {
-      return;
-    }
+    if (!value) return;
+
     const stats = value
-      .filter((loggy) => loggy.message!.indexOf('Billed Duration') > -1)
+      .filter((logEntry) => logEntry.message!.indexOf('Billed Duration') > -1)
       .map((stat) => {
-        if (!stat?.message?.split) {
-          return;
-        }
+        if (!stat?.message?.split) return;
 
         return {
           name: key,
-          // @ts-ignore
           duration: parseInt(stat.message.split('ms').flatMap((ms: string) => ms.split(' '))[3]),
-          // @ts-ignore
           memory_usage: parseInt(stat.message.split('ms').flatMap((ms: string) => ms.split(' '))[15]),
         };
       });
@@ -116,16 +103,15 @@ export const getMetrics = async () => {
     })();
 
     const thisRound = getGreatestStats(stats);
-    const eventOccured = (text: string) => value.filter((loggy) => contains(loggy.message, text)).length > 0;
+    const eventOccurred = (text: string) => value.filter((loggy) => contains(loggy.message, text)).length > 0;
 
-    const didTimeout = eventOccured('Task timed out after');
+    const didTimeout = eventOccurred('Task timed out after');
     const didFail =
-      eventOccured('Exception') ||
-      eventOccured('Failed') ||
-      eventOccured('ERROR') ||
-      eventOccured('Runtime exited with error');
+      eventOccurred('Exception') ||
+      eventOccurred('Failed') ||
+      eventOccurred('ERROR') ||
+      eventOccurred('Runtime exited with error');
 
-    // TODO we're appending all logs, only append relevant
     const merged = {
       ...thisRound,
       ...{
