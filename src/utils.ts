@@ -1,28 +1,45 @@
-import path, { join } from 'path';
+import { join } from 'path';
 import * as os from 'os';
 import { readFileSync, writeFileSync } from 'fs';
 import { spawn } from 'child_process';
 import { randomUUID } from 'crypto';
-import { Worker } from 'worker_threads';
 import { parse as parseEnvFile } from 'dotenv';
-import { ContractsAndRequestsConfig, IntegrationInfo, StressTestConfig } from './types';
-import { generateConfigJson } from './config_utils';
+import { IntegrationInfo, StressTestConfig } from './types';
+import { generateConfigJson } from './config-utils';
 import { cliPrint } from './cli';
 import { getAirnodeWalletMnemonic } from './chain';
-import {DEFAULT_CHAIN_ID} from "./constants";
+import { DEFAULT_CHAIN_ID } from './constants';
+import { initDB } from './database';
+
+export const checkSshSanity = ({ sshConfig, testType }: StressTestConfig) => {
+  if (testType === 'RopstenProvider') {
+    return;
+  }
+  const { sshKeyPath, sshRemoteHost, sshUser, sshPort } = sshConfig;
+
+  if (contains(sshRemoteHost, 'local') && !(sshRemoteHost && sshUser && sshPort && sshKeyPath)) {
+    cliPrint.error(
+      `You specified an SSH host other than 'local' but one or more of your SSH parameters is either ` +
+        `missing or invalid.`
+    );
+    process.exit(1);
+  }
+};
 
 export const getGcpCredentials = () => {
   const stressTestConfig = getStressTestConfig();
-  if (stressTestConfig.CloudProvider.name === 'gcp') {
+  if (stressTestConfig.cloudProvider.type === 'gcp') {
     return [
-      ` -v ${path.join(os.homedir(), '/.config/gcloud/application_default_credentials.json:/application_default_credentials.json')} `,
-      ' -e "GOOGLE_APPLICATION_CREDENTIALS=/application_default_credentials.json" '
+      ` -v ${join(
+        os.homedir(),
+        '/.config/gcloud/application_default_credentials.json:/application_default_credentials.json'
+      )} `,
+      ' -e "GOOGLE_APPLICATION_CREDENTIALS=/application_default_credentials.json" ',
     ];
   }
 
   return [' ', ' '];
 };
-
 
 /**
  * @returns a provider URL based on the stress test config dictionary and optionally a request count (only applicable
@@ -32,7 +49,11 @@ export const getGcpCredentials = () => {
  * @param requestCount The number of requests the endpoint will return for getLogs, optional
  */
 export const getConfiguredProviderURL = (stressTestConfig: StressTestConfig, requestCount?: number) => {
-  switch (stressTestConfig.TestType) {
+  if (stressTestConfig.infuraProviderUrl) {
+    return stressTestConfig.infuraProviderUrl;
+  }
+
+  switch (stressTestConfig.testType) {
     case 'MockedProvider':
       return `https://mockedrpc.api3mock.link/${requestCount ? requestCount : 100}/`;
     case 'OpenEthereumProvider':
@@ -40,8 +61,7 @@ export const getConfiguredProviderURL = (stressTestConfig: StressTestConfig, req
     case 'HardHatProvider':
       return 'https://hardhat.api3mock.link';
     case 'RopstenProvider':
-      return stressTestConfig.InfuraProviderURL;
-    default: //not possible
+      return stressTestConfig.infuraProviderUrl;
   }
 };
 
@@ -64,17 +84,16 @@ export const contains = (a?: string, b?: string): boolean => {
  */
 export const getIntegrationInfo = (): IntegrationInfo => {
   const stressTestConfig = getStressTestConfig();
-  const integrationConfig = {
+
+  return {
     integration: 'coingecko-testable',
     airnodeType: 'local',
     network: 'docker-poa-network',
-    mnemonic: stressTestConfig.MasterWalletOverrideMnemonic
-      ? stressTestConfig.MasterWalletOverrideMnemonic
+    mnemonic: stressTestConfig.masterWalletOverrideMnemonic
+      ? stressTestConfig.masterWalletOverrideMnemonic
       : 'test test test test test test test test test test test junk',
     providerUrl: getConfiguredProviderURL(stressTestConfig),
   } as IntegrationInfo;
-
-  return integrationConfig;
 };
 
 /**
@@ -92,28 +111,26 @@ export const readAirnodeSecrets = () => {
 };
 
 /**
- * @returns The contents of the "config.json" file for the current integration (throws if it doesn't exist)
- */
-export const readConfig = () => {
-  const integrationInfo = getIntegrationInfo();
-
-  const config = JSON.parse(
-    readFileSync(join(__dirname, `../integrations/${integrationInfo.integration}/config.json`)).toString()
-  );
-  return config;
-};
-
-/**
- * @param secrets The lines of the secrets file
- * @returns All the lines joined followed by a new line symbol
- */
-export const formatSecrets = (secrets: string[]) => secrets.join('\n') + '\n';
-
-/**
  * @param filename
  * @returns The "filename" with the last extension removed
  */
 export const removeExtension = (filename: string) => filename.split('.')[0];
+
+export const getMaxBatchSize = (stressTestConfig: StressTestConfig) => {
+  if (stressTestConfig.maxBatchSize) {
+    return stressTestConfig.maxBatchSize;
+  }
+
+  return 5;
+};
+
+export const getPostgresDatabase = ({ postgresConfig }: StressTestConfig) => {
+  if (postgresConfig && postgresConfig.enabled) {
+    return initDB(postgresConfig);
+  }
+
+  return undefined;
+};
 
 /**
  * Convenience function to set up a timeout.
@@ -132,7 +149,7 @@ export const getStressTestConfig = () =>
  *
  * @param rrps A list of Rrp deployments for simulating multiple chains
  */
-export const refreshConfigJson = async (rrps: ContractsAndRequestsConfig[]) => {
+export const refreshConfigJson = async (rrps: string[]) => {
   const config = join(__dirname, `../config.json`);
   const configPayload = generateConfigJson(rrps);
   try {
@@ -142,6 +159,8 @@ export const refreshConfigJson = async (rrps: ContractsAndRequestsConfig[]) => {
     console.trace(e);
     cliPrint.error(`Failed to write airnode ${config} file.`);
   }
+
+  return configPayload;
 };
 
 /**
@@ -245,15 +264,16 @@ export const pluralString = (input: number) => (input === 1 ? '' : 's');
  * @param providerOverride an optional provider override URL
  */
 export const refreshSecrets = async (requestCount?: number, providerOverride?: string) => {
-  const {ChainId} = getStressTestConfig();
-  const providerUrl = providerOverride ?
-      providerOverride : getConfiguredProviderURL(getStressTestConfig(), requestCount);
+  const { chainId } = getStressTestConfig();
+  const providerUrl = providerOverride
+    ? providerOverride
+    : getConfiguredProviderURL(getStressTestConfig(), requestCount);
 
   //https://mitm-hardhat.api3mock.link
   const airnodeSecrets = `PROVIDER_URL=${providerUrl}
 AIRNODE_WALLET_MNEMONIC=${getAirnodeWalletMnemonic()}
 AIRNODE_RRP_ADDRESS=0x5FbDB2315678afecb367f032d93F642f64180aa3
-CHAIN_ID=${ChainId ? ChainId : DEFAULT_CHAIN_ID}
+CHAIN_ID=${chainId ? chainId : DEFAULT_CHAIN_ID}
 CLOUD_PROVIDER_TYPE=local
 HTTP_GATEWAY_API_KEY=${randomUUID()}
 `;
@@ -288,7 +308,7 @@ export const removeAirnode = async () => {
   const integrationPath = join(__dirname, '../integration-info.json');
   writeFileSync(integrationPath, JSON.stringify(getIntegrationInfo()));
   const secretsFilePath = join(__dirname, '../aws.env');
-  const [gcpCredsMount, gcpCredsEnv ] = getGcpCredentials();
+  const [gcpCredsMount, gcpCredsEnv] = getGcpCredentials();
 
   const deployCommand = [
     `docker run -i --rm`,
@@ -297,12 +317,10 @@ export const removeAirnode = async () => {
     gcpCredsEnv,
     gcpCredsMount,
     `-v ${join(__dirname, '../')}:/app/output`,
-    `api3/airnode-deployer:latest remove -r output/receipt.json --debug`,
+    `aquarat/airnode-deployer:latest remove -r output/receipt.json --debug`,
   ].join(' ');
-  console.log(deployCommand);
-
   cliPrint.info(deployCommand);
-  // runShellCommand(deployCommand);
+
   return processSpawn(deployCommand, 'Remove Airnode', 'Error', 'S3 bucket does not exist').catch(() => {
     cliPrint.warning('Failed to remove Airnode, trying again.');
     processSpawn(deployCommand, 'Remove Airnode', 'Error').catch(() => {});

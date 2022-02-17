@@ -23,6 +23,7 @@ services:
     command: mitmweb --web-host 0.0.0.0 --mode reverse:http://tasks.hardhat:8545
 
   mock-json-rpc-api:
+    build: ./mock-json-rpc
     image: aquarat/mock-json-rpc-api:latest
     networks:
       traefik-web:
@@ -37,6 +38,7 @@ services:
         - 'traefik.http.routers.mockedrpc-secured.tls.certresolver=mytlschallenge'
 
   hardhat:
+    build: ./hardhat-build
     image: aquarat/hardhat:latest
     deploy:
       labels:
@@ -52,6 +54,7 @@ services:
     entrypoint: "bash -c 'npx hardhat node'"
 
   mock-api:
+    build: ./mock-api
     image: aquarat/mock-api:latest
     deploy:
       labels:
@@ -66,6 +69,7 @@ services:
       traefik-web:
 
   openethereum:
+    build: ./openethereum-build
     image: aquarat/openethereum:latest
     deploy:
       labels:

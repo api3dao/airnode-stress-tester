@@ -2,7 +2,7 @@
   "TestRuns": [
     {
       "RequestCount": 1,
-      "WalletCount": 2,
+      "WalletCount": 1,
       "ChainCount": 1
     }
   ],
@@ -13,24 +13,30 @@
   },
   "SshConfig": {
     "SshKeyPath": "/home/aquarat/Downloads/211125API3-aquarat.pem",
-    "SshRemoteHost": "graphs.api3mock.link",
+    "SshRemoteHost": "a-hostname",
     "SshUser": "ubuntu",
     "SshPort": 22,
     "YamlPath": "/home/ubuntu/stress-services.yml"
   },
   "PostgresConfig": {
-    "PostgresEnabled": true,
+    "PostgresEnabled": false,
     "PostgresUser": "airnode",
     "PostgresPassword": "airnode",
-    "PostgresHost": "graphs.api3mock.link",
+    "PostgresHost": "a-hostname",
     "PostgresPort": 5432,
     "PostgresDatabase": "airnode"
   },
   "RandomLength": 5,
-  "TestType": "HardHatProvider",
-  "Comment": "768 and 468 MB no traces",
+  "TestType": "RopstenProvider",
+  "Comment": "AWS 512 MB AWS Comparison",
   "CloudProvider": {
-    "name": "aws",
+    "type": "aws",
     "region": "us-east-1"
-  }
+  },
+  "NodeVersion": "0.1.2",
+  "MaxBatchSize": 5,
+  "ChainId": 3,
+  "InfuraProviderURL": "https://ropsten.infura.io/v3/2441a362d68147c2b2d84a1b4e3cc448",
+  "MasterWalletOverrideMnemonic": "test test test...",
+  "IgnoreNodeVersion": true
 }

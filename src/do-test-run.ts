@@ -1,385 +1,244 @@
 import * as crypto from 'crypto';
-import {existsSync} from 'fs';
-import {join} from 'path';
-import {ethers, Wallet} from 'ethers';
-import * as admin from '@api3/airnode-admin/dist/src/implementation';
-import {AirnodeRrp} from '@api3/airnode-protocol';
-import {range} from 'lodash';
+import { existsSync } from 'fs';
+import { join } from 'path';
+import { range } from 'lodash';
+import Bottleneck from 'bottleneck';
 import {
-    runAndHandleErrors,
-    cliPrint,
-    sendToDB,
-    initDB,
-    deriveSponsorWalletAddress,
-    deriveAirnodeXpub,
-    RequestSet,
-    ContractsAndRequestsConfig,
-    doTimeout,
-    getStressTestConfig,
-    getProvider,
-    processSpawn,
-    refreshConfigJson,
-    getAirnodeWallet,
-    pluralString,
-    contains,
-    appendMetrics,
-    collectMetrics,
-    deployContract,
-    getIntegrationInfo,
-    refreshSecrets,
-    removeAirnode,
-    generateConfigJson,
-    getEncodedParameters,
-    generateRandomString,
-    getGcpCredentials, setPriority
-} from './';
-import {NonceManager} from "@ethersproject/experimental";
-import Bottleneck from "bottleneck";
+  checkSshSanity,
+  doTimeout,
+  getGcpCredentials,
+  getIntegrationInfo,
+  getPostgresDatabase,
+  getStressTestConfig,
+  pluralString,
+  processSpawn,
+  refreshConfigJson,
+  refreshSecrets,
+  removeAirnode,
+  setPriority,
+} from './utils';
+import { cliPrint, runAndHandleErrors } from './cli';
+import { sendToDB } from './database';
+import { deployContractAndCreateRequests, doHardHatMine, getProvider } from './chain';
+import { OutputMetrics, RequestSet, RunDependencies } from './types';
+import { appendMetrics } from './metrics-file-output';
+import { collectMetrics } from './metrics-utils';
 
 process.env.AWS_SDK_LOAD_CONFIG = String(true);
-process.setMaxListeners(2000);
 
-const main = async () => {
-    const stressTestConfig = getStressTestConfig();
+const doSubTestRun = async (runProps: RunDependencies): Promise<OutputMetrics> => {
+  if (runProps.requestSets.length === 0) {
+    cliPrint.error(`RequestSet array length is 0`);
+    return { metrics: [], success: false };
+  }
+  const { config } = runProps;
+  const { requestCount, walletCount, chainCount } = runProps.requestSets[0];
+  const { testType, runRepeats, sshConfig, infuraProviderAirnodeOverrideURL } = config;
+  const { sshRemoteHost, sshUser, sshPort, sshKeyPath, yamlPath } = sshConfig;
 
-    const {
-        TestRuns,
-        RunRepeats,
-        PostgresConfig,
-        JsonOutputConfig,
-        SshConfig,
-        TestType,
-        InfuraProviderAirnodeOverrideURL
-    } = getStressTestConfig();
-    const {SshKeyPath, SshRemoteHost, SshUser, SshPort, YamlPath} = SshConfig;
+  const mockedRPC = testType === 'MockedProvider';
+  const ropstenProvider = testType === 'RopstenProvider';
+  const restartServices = !(ropstenProvider || mockedRPC);
 
-    /*
-    HardHat gets unhappy if you hit it with more than 10 RPC calls simultaneously.
-     */
-    const maxBatchSize = (() => {
-        if (stressTestConfig.MaxBatchSize) {
-            return stressTestConfig.MaxBatchSize
-        }
+  cliPrint.info(
+    `Doing ${requestCount} request${pluralString(requestCount)} with ${walletCount} wallet` +
+      `${pluralString(walletCount)} against ` +
+      `${chainCount} chain${pluralString(chainCount)} a total of ` +
+      `${runRepeats} time${pluralString(runRepeats)}...`
+  );
 
-        return 5;
-    })();
+  // Remove airnode - this tends to fail often, so we do it multiple times for safety.
+  await removeAirnode().catch();
 
-    if (contains(SshRemoteHost, 'local') && !(SshRemoteHost && SshUser && SshPort && SshKeyPath)) {
-        cliPrint.error(
-            `You specified an SSH host other than 'local' but one or more of your SSH parameters is either ` +
-            `missing or invalid.`,
-        );
-        process.exit(1);
+  if (restartServices) {
+    cliPrint.info('Restarting services...');
+
+    if (sshRemoteHost === 'local') {
+      await processSpawn(
+        `bash -c 'docker stack rm services || true; sleep 10; docker stack deploy ` +
+          `-c ${join(__dirname, '../docker-compose.yml')} services'`,
+        'Initialise Services'
+      ).catch((err) => {
+        console.trace('Failed to restart services: ', err);
+      });
+    } else {
+      await processSpawn(
+        `ssh -o UserKnownHostsFile=/dev/null ` +
+          `-o StrictHostKeyChecking=no -i ${sshKeyPath} -p ${sshPort} ` +
+          `${sshUser}@${sshRemoteHost} ` +
+          `'docker stack rm services || true; sleep 10; docker stack deploy -c ${yamlPath} services || true; sleep 20;'`,
+        'Initialise Services'
+      ).catch((err) => {
+        console.trace('Failed to restart services - aborting this run: ', err);
+      });
     }
 
-    const testKey = crypto.randomUUID();
-    const mockedRPC = TestType === 'MockedProvider';
-    const ropstenProvider = TestType === 'RopstenProvider';
-    const restartServices = !(ropstenProvider || mockedRPC);
+    await doTimeout(20000);
+    cliPrint.info('Services restarted, now initialising chain services...');
+  }
 
-    await refreshSecrets();
-    await refreshConfigJson([]); // for code that requires the endpointId
+  const provider = getProvider(getIntegrationInfo());
+  if (testType === 'HardHatProvider') {
+    provider.send('evm_setAutomine', [false]).catch((e) => {
+      console.trace('Setting automine failed', e);
+    });
+    // disables mining - you have to manually mine a block
+    provider.send('evm_setIntervalMining', [0]).catch((e) => {
+      console.trace('Setting interval failed', e);
+    });
+  }
 
-    if (!existsSync(join(__dirname, 'artifacts/contracts/Requestor.sol'))) {
-        cliPrint.info('Ask HardHat to compile contracts.');
-        await processSpawn('yarn hardhat compile', 'HardHat Compile');
-    }
+  if (testType === 'HardHatProvider') {
+    await doHardHatMine(provider, testType);
 
-    // Initialise the database if configured
-    const pg = (() => {
-        if (PostgresConfig && PostgresConfig.PostgresEnabled) {
-            return initDB(PostgresConfig);
-        }
+    // turn on interval mining again
+    await provider.send('evm_setIntervalMining', [15000]).catch((e) => {
+      console.trace('Setting interval to 5000ms failed', e);
+    });
+    provider.send('hardhat_setLoggingEnabled', [true]).catch(() => {});
+  }
 
-        return null;
-    })();
+  const limit = new Bottleneck({
+    maxConcurrent: 1,
+  });
 
-    const doRun = async ({RequestCount, WalletCount, ChainCount}: RequestSet, tries: number) => {
-        const runStart = Date.now();
+  const rrps = await Promise.all(
+    range(chainCount).map(async (_, idx) =>
+      limit.schedule(() => deployContractAndCreateRequests({ chainNumber: idx, provider, config, walletCount }))
+    )
+  );
 
-        const runMetrics = await (async (): Promise<{ metrics: any; success: boolean }> => {
-            cliPrint.info(
-                `Doing ${RequestCount} request${pluralString(RequestCount)} with ${WalletCount} wallet` +
-                `${pluralString(WalletCount)} against ` +
-                `${ChainCount} chain${pluralString(ChainCount)} a total of ` +
-                `${RunRepeats} time${pluralString(RunRepeats)}...`,
-            );
+  cliPrint.info('Requests submitted to network, waiting for them to be mined.');
+  const configPayload = await refreshConfigJson(rrps);
+  const { stage } = configPayload.nodeSettings;
 
-            // Remove airnode - this tends to fail often, so we do it multiple times for safety.
-            await removeAirnode().catch();
+  await doTimeout(10000);
+  cliPrint.info('Done waiting for requests to be mined.');
+  cliPrint.info('Deploying Airnode to AWS...');
+  await refreshSecrets(requestCount);
+  const secretsFilePath = join(__dirname, '../aws.env');
 
-            if (restartServices) {
-                cliPrint.info('Restarting services...');
+  const [gcpCredsMount, gcpCredsEnv] = getGcpCredentials();
 
-                if (SshRemoteHost === 'local') {
-                    await processSpawn(
-                        `bash -c 'docker stack rm services || true; sleep 10; docker stack deploy ` +
-                        `-c ${join(__dirname, '../docker-compose.yml')} services'`,
-                        'Initialise Services',
-                    ).catch((err) => {
-                        console.trace('Failed to restart services: ', err);
-                    });
-                } else {
-                    await processSpawn(
-                        `ssh -o UserKnownHostsFile=/dev/null ` +
-                        `-o StrictHostKeyChecking=no -i ${SshKeyPath} -p ${SshPort} ` +
-                        `${SshUser}@${SshRemoteHost} ` +
-                        `'docker stack rm services || true; sleep 10; docker stack deploy -c ${YamlPath} services || true; sleep 20;'`,
-                        'Initialise Services',
-                    ).catch((err) => {
-                        console.trace('Failed to restart services - aborting this run: ', err);
-                    });
-                }
+  const deployCommand = [
+    `docker run -i --rm`,
+    `--env-file ${secretsFilePath}`,
+    gcpCredsEnv,
+    gcpCredsMount,
+    `-e USER_ID=$(id -u) -e GROUP_ID=$(id -g)`,
+    `-v ${join(__dirname, '../')}:/app/config`,
+    `-v ${join(__dirname, '..')}:/app/output`,
+    `api3/airnode-deployer:latest deploy`,
+    '--debug',
+  ].join(' ');
+  cliPrint.info(deployCommand);
 
-                await doTimeout(20000);
-                cliPrint.info('Services restarted, now initialising chain services...');
-            }
-
-            const provider = getProvider(getIntegrationInfo());
-            if (TestType === 'HardHatProvider') {
-                provider.send('evm_setAutomine', [false]).catch((e) => {
-                    console.trace('Setting automine failed', e);
-                });
-                // disables mining - you have to manually mine a block
-                provider.send('evm_setIntervalMining', [0]).catch((e) => {
-                    console.trace('Setting interval failed', e);
-                });
-            }
-
-            const deployContractAndRequests = async (chainNumber: number): Promise<ContractsAndRequestsConfig> => {
-                const limit = new Bottleneck({
-                    maxConcurrent: maxBatchSize,
-                });
-                const endpointId = generateConfigJson([]).triggers.rrp[0].endpointId;
-
-                if (TestType === 'HardHatProvider') {
-                    provider.send('evm_mine', []).catch((e) => {
-                        console.trace('Mine block failed', e);
-                    });
-                }
-
-                const airnodeRrp = await deployContract(
-                    getIntegrationInfo(),
-                    '@api3/airnode-protocol/contracts/rrp/AirnodeRrp.sol',
-                    chainNumber
-                );
-                cliPrint.info(`AirnodeRrp deployed to address: ${airnodeRrp.address}`);
-
-                const airnodeWallet = getAirnodeWallet().connect(provider);
-                const masterSponsor = ethers.Wallet.fromMnemonic(getIntegrationInfo().mnemonic).connect(provider);
-                const nMSponsor = new NonceManager(masterSponsor);
-
-                const requester = await deployContract(getIntegrationInfo(),
-                    `contracts/Requester.sol`,
-                    chainNumber, [airnodeRrp.address], nMSponsor);
-                const USE_SAME_SPONSOR = false;
-
-                const receipts = range(WalletCount)
-                    .map(() => (USE_SAME_SPONSOR ? masterSponsor : ethers.Wallet.createRandom().connect(provider)))
-                    .map((sponsor) => {
-                        // Sometimes HardHat dies due to the load, in this case we slow things down using Bottleneck
-                        const chainSetupFunction = async (sponsor: Wallet) => {
-                            try {
-                                const sponsorWalletAddress = await deriveSponsorWalletAddress(
-                                    // NOTE: When doing this manually, you can use the 'derive-airnode-xpub' from the admin CLI package
-                                    deriveAirnodeXpub(airnodeWallet.mnemonic.phrase),
-                                    airnodeWallet.address,
-                                    sponsor.address,
-                                );
-                                cliPrint.info(`Derived Sponsor Wallet Address ${sponsorWalletAddress}`);
-                                // Fund the sponsor wallet
-                                const tx1 = await nMSponsor.sendTransaction({
-                                    to: sponsorWalletAddress,
-                                    value: ethers.utils.parseEther('0.1'),
-                                });
-                                cliPrint.info(`Sent tx to fund sponsor wallet, waiting for tx to be mined...`);
-                                await tx1.wait();
-                                cliPrint.info(`Tx mined, moving on to funding sponsor.`);
-                                // Fund the sponsor
-                                const tx2 = await nMSponsor.sendTransaction({
-                                    to: sponsor.address,
-                                    value: ethers.utils.parseEther('0.1'),
-                                });
-                                cliPrint.info(`Waiting for tx to be mined...`);
-                                await tx2.wait();
-
-                                const airnodeRrpWithSigner = airnodeRrp
-                                    .connect(sponsor.connect(provider)) as AirnodeRrp;
-                                // Sponsor the requester
-                                cliPrint.info(`Sponsoring requester...`);
-
-                                const tx3 =
-                                    await airnodeRrpWithSigner.setSponsorshipStatus(requester.address, true);
-                                if (ropstenProvider) {
-                                    await tx3.wait(1);
-                                }
-
-                                // Trigger the Airnode request
-                                cliPrint.info(`Making a request to sponsor wallet: ${sponsorWalletAddress}`);
-                                const receipt = await requester.makeRequest(
-                                    airnodeWallet.address,
-                                    endpointId,
-                                    sponsor.address,
-                                    sponsorWalletAddress,
-                                    getEncodedParameters(generateRandomString(5))
-                                );
-                                cliPrint.info(`Made request, receipt: ${receipt.hash}`);
-
-                                return receipt;
-                            } catch (e) {
-                                console.trace(e);
-                            }
-                        };
-
-                        return limit.schedule(() => chainSetupFunction(sponsor));
-                    });
-                cliPrint.info("Waiting for receipts to resolve...");
-                await Promise.all(receipts);
-                cliPrint.info("Receipts resolved.");
-                cliPrint.info('Done initialising chain services, moving on to executing requests...');
-
-                const confData = {
-                    AirnodeRrpAddress: airnodeRrp.address,
-                    AirnodeMnemonic: airnodeWallet.mnemonic.phrase,
-                };
-
-                // mine all the transactions
-                if (TestType === 'HardHatProvider') {
-                    await provider.send('evm_mine', []).catch((e) => {
-                        console.trace('Mine block failed', e);
-                    });
-                }
-
-                return confData;
-            };
-
-            if (TestType === 'HardHatProvider') {
-                // mine all the transactions
-                await provider.send('evm_mine', []).catch((e) => {
-                    console.trace('Mine block failed', e);
-                });
-
-                // turn on interval mining again
-                await provider.send('evm_setIntervalMining', [15000]).catch((e) => {
-                    console.trace('Setting interval to 5000ms failed', e);
-                });
-                provider.send('hardhat_setLoggingEnabled', [true]).catch(() => {
-                });
-            }
-
-            const limit = new Bottleneck({
-                maxConcurrent: 1,
-            });
-
-            const rrps = await Promise.all(range(ChainCount).map(async (_, idx) => {
-                return limit.schedule(() => deployContractAndRequests(idx));
-            }));
-
-            cliPrint.info('Requests submitted to network, waiting for them to be mined.');
-            await refreshConfigJson(rrps);
-
-            await doTimeout(10000);
-            cliPrint.info('Done waiting for requests to be mined.');
-            cliPrint.info('Deploying Airnode to AWS...');
-            await refreshSecrets(RequestCount);
-            const secretsFilePath = join(__dirname, '../aws.env');
-
-            const [gcpCredsMount, gcpCredsEnv] = getGcpCredentials();
-
-            const deployCommand = [
-                `docker run -i --rm`,
-                `--env-file ${secretsFilePath}`,
-                gcpCredsEnv,
-                gcpCredsMount,
-                `-e USER_ID=$(id -u) -e GROUP_ID=$(id -g)`,
-                `-v ${join(__dirname, '../')}:/app/config`,
-                `-v ${join(__dirname, '..')}:/app/output`,
-                `api3/airnode-deployer:latest deploy`,
-            ].join(' ');
-            cliPrint.info(deployCommand);
-
-            await refreshSecrets(RequestCount, InfuraProviderAirnodeOverrideURL);
-            try {
-                await processSpawn(deployCommand, 'Deploy Airnode', 'Failed');
-            } catch (e) {
-                console.trace(e);
-                cliPrint.info('Failed to deploy Airnode, trying to remove it first.');
-                await removeAirnode();
-                try {
-                    await processSpawn(deployCommand, 'Deploy Airnode', 'Failed again (inside catch)');
-                } catch (e) {
-                    console.trace(e);
-                    cliPrint.info('Tried twice to deploy Airnode but both attempts failed, quitting...');
-                    process.exit(1);
-                }
-            }
-            await refreshSecrets(RequestCount);
-
-            // Collect metrics
-            const collectedMetrics = await collectMetrics();
-            cliPrint.info(`Collected metrics: ${JSON.stringify(collectedMetrics, null, 2)}`);
-
-            return collectedMetrics;
-        })();
-
-        const runEnd = Date.now();
-
-        const outputMetrics = {
-            ...runMetrics,
-            ...{
-                runStart,
-                runEnd,
-                runDelta: runEnd - runStart,
-                requestCount: RequestCount,
-                success: runMetrics?.success,
-                walletCount: WalletCount,
-                chainCount: ChainCount,
-            },
-        };
-
-        appendMetrics(JsonOutputConfig, {...outputMetrics, testKey, TestType});
-        await sendToDB(pg, outputMetrics, testKey, stressTestConfig);
-
-        return {success: runMetrics?.success, RequestCount, tries: tries - 1};
-    };
-
-    const doRunSet = async (requestSet: RequestSet[]) => {
-        const runResults = new Array<RequestSet>();
-
-        for (let i = 0; i < requestSet.length; i++) {
-            for (let k = 0; k < stressTestConfig.RunRepeats; k++) {
-                for (let j = 3; j > 0; j--) {
-                    const {success} = await doRun(requestSet[i], j);
-                    if (success) {
-                        runResults.push(TestRuns[i]);
-                        break;
-                    }
-                }
-            }
-        }
-
-        return runResults;
-    };
-
-    const runResults = await doRunSet(TestRuns);
-    const missingResults = TestRuns.filter((x) => !runResults.includes(x));
-    if (missingResults.length > 0) {
-        cliPrint.info(`Rerun: Unfortunately the following runs failed and will be retried: ${missingResults}`);
-    }
-    await doRunSet(missingResults);
-
-    cliPrint.info('Cleaning up - removing Airnode deployment...');
+  await refreshSecrets(requestCount, infuraProviderAirnodeOverrideURL);
+  try {
+    await processSpawn(deployCommand, 'Deploy Airnode', 'Failed');
+  } catch (e) {
+    console.trace(e);
+    cliPrint.info('Failed to deploy Airnode, trying to remove it first.');
     await removeAirnode();
+    try {
+      await processSpawn(deployCommand, 'Deploy Airnode', 'Failed again (inside catch)');
+    } catch (e) {
+      console.trace(e);
+      cliPrint.info('Tried twice to deploy Airnode but both attempts failed, quitting...');
+      process.exit(1);
+    }
+  }
+  await refreshSecrets(requestCount);
+
+  const collectedMetrics = await collectMetrics(stage, rrps);
+  cliPrint.info(`Collected metrics: ${JSON.stringify(collectedMetrics, null, 2)}`);
+
+  return collectedMetrics;
 };
 
-/**
- * We make use of Node WORKERs to execute transaction signing and submission. This process appears to be CPU
- * intensive in ethers, so it benefits from being done in a highly concurrent fashion.
- *
- * This subsystem was originally designed with a goal of 1000 requests per cycle.
- *
- * The parent process executes main() and worker processes take the alternative path.
- */
+const doTestRun = async (runProps: RunDependencies) => {
+  const { jsonOutputConfig } = runProps.config;
+  const { testKey, tries } = runProps;
+
+  if (runProps.requestSets.length === 0) {
+    return { success: false, tries: tries - 1 };
+  }
+  const { requestCount, walletCount, chainCount } = runProps.requestSets[0];
+
+  const runStart = Date.now();
+  const runMetrics = await doSubTestRun(runProps);
+  const runEnd = Date.now();
+
+  const outputMetrics = {
+    ...runMetrics,
+    ...{
+      runStart,
+      runEnd,
+      runDelta: runEnd - runStart,
+      requestCount,
+      walletCount,
+      chainCount,
+    },
+    testKey,
+  };
+
+  appendMetrics(jsonOutputConfig, outputMetrics, runProps.config);
+  if (runProps.db) {
+    await sendToDB(runProps.db, outputMetrics, runProps.config);
+  }
+
+  return { success: runMetrics?.success, requestCount, tries: tries - 1 };
+};
+
+const doTestRunSet = async (runProps: RunDependencies) => {
+  const { config, requestSets } = runProps;
+  const runResults = new Array<RequestSet>();
+
+  for (let i = 0; i < requestSets.length; i++) {
+    for (let k = 0; k < config.runRepeats; k++) {
+      for (let j = 3; j > 0; j--) {
+        const { success } = await doTestRun({
+          ...runProps,
+          requestSets: [requestSets[i]],
+          tries: 1,
+        });
+        if (success) {
+          runResults.push(config.testRuns[i]);
+          break;
+        }
+      }
+    }
+  }
+
+  return runResults;
+};
+
+const main = async () => {
+  const config = getStressTestConfig();
+  checkSshSanity(config);
+
+  const testKey = crypto.randomUUID();
+  const db = getPostgresDatabase(config);
+
+  await refreshSecrets();
+  await refreshConfigJson([]); // for code that requires the endpointId
+
+  if (!existsSync(join(__dirname, 'artifacts/contracts/Requestor.sol'))) {
+    cliPrint.info('Ask HardHat to compile contracts.');
+    await processSpawn('yarn hardhat compile', 'HardHat Compile');
+  }
+
+  const runDependencies = { config, db, testKey, tries: 1, requestSets: config.testRuns };
+  const runResults = await doTestRunSet(runDependencies);
+  const missingResults = config.testRuns.filter((x) => !runResults.includes(x));
+  if (missingResults.length > 0) {
+    cliPrint.info(`Rerun: Unfortunately the following runs failed and will be retried: ${missingResults}`);
+  }
+  await doTestRunSet({ ...runDependencies, requestSets: missingResults });
+
+  cliPrint.info('Cleaning up - removing Airnode deployment...');
+  await removeAirnode();
+};
 
 setPriority();
 runAndHandleErrors(main);
