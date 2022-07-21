@@ -40,7 +40,7 @@
     "@google-cloud/logging": "^9.6.3",
     "@nomiclabs/hardhat-ethers": "^2.0.2",
     "@nomiclabs/hardhat-waffle": "^2.0.1",
-    "@openzeppelin/contracts": "^4.3.3",
+    "@openzeppelin/contracts": "^4.7.1",
     "@types/jest": "^27.0.2",
     "@types/lodash": "^4.14.177",
     "@types/mocha": "^9.0.0",
